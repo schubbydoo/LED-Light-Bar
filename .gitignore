@@ -1,0 +1,29 @@
+# Build output
+build/
+dist/
+.pio/
+.pioenvs/
+*.bin
+*.elf
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets — never commit
+.env
+secrets.h
+credentials.h
+
+# The SFX Box repo is deliberately NOT vendored here.
+_SFXbox_ref/
+sfx-box/webui/
