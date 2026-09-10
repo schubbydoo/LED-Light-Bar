@@ -40,9 +40,15 @@
                       pops that stop it feeling looped.
 
   Colour is a pure function of heat — never randomised, and the top of the ramp
-  is warm amber rather than white, because pure white reads as a camera flash.
-  Gamma is applied last; without it the low end vanishes and smooth fades look
-  stepped, which is the usual answer to "why does it look steppy".
+  is warm yellow rather than white, because pure white reads as a camera flash.
+
+  **Per-channel gamma is OFF by default, against docs/01's advice, and the
+  reason is written out at buildGamma().** Short version: gamma decode is correct
+  for colours authored in sRGB, this palette is authored as PWM values, and
+  applying it a second time crushes the small green component out of every warm
+  colour — turning the whole ramp one step redder. It is still tunable, because
+  the fade-smoothness problem the doc describes is real; the fix for that is to
+  gamma the intensity, not each channel.
 
   ---------------------------------------------------------------------------
   TUNING IT
@@ -93,12 +99,34 @@ CRGB leds[NUM_LEDS];
 // finished — see docs/01 for what each still needs.
 // ---------------------------------------------------------------------------
 
+// Orange is the body of a fire. Red belongs to the embers underneath it and
+// yellow to the sparks coming off it — so the ramp reaches orange EARLY and
+// spends most of its length there, rather than treating orange as a waypoint on
+// the road to white.
+//
+// That matters because of where the simulation actually sits. Idle heat averages
+// about 0.44 — noise around 0.5, breath around 0.875 — so index ~112 is the
+// colour you see most of the time, and it has to be orange. The first version
+// put a red-orange there and reached orange only at the peaks, which reads as a
+// red fire with occasional orange rather than an orange fire with red embers.
+// The useful way to read this ramp is the GREEN-TO-RED RATIO, because that is
+// the whole red-orange-yellow axis and it is the only thing your eye is judging:
+//
+//     g/r ~ 0.1   red            g/r ~ 0.45  orange
+//     g/r ~ 0.30  red-orange     g/r ~ 0.70  amber
+//                                g/r ~ 0.90  yellow
+//
+// The body of the fire sits near index 112 (idle heat averages ~0.44), so that
+// entry has to land around 0.43. The peaks are where flares put it, and the top
+// entry wants to be AMBER, not yellow: the previous top was g/r 0.90 and every
+// crackle read as a yellow flash.
 DEFINE_GRADIENT_PALETTE(pal_fire) {
-      0,  40,   0,   0,     // dying ember
-     64, 120,  10,   0,     // deep red
-    128, 200,  50,   0,     // orange
-    191, 255, 110,  10,     // bright flame
-    255, 255, 190,  80      // white-hot tip — warm, NOT white
+      0,  50,   0,   0,     // ember bed — deep red, never black
+     40, 130,  18,   0,     // red                       g/r 0.14
+     95, 215,  85,   0,     // orange arrives            g/r 0.40
+    145, 250, 120,   4,     // ORANGE — the body         g/r 0.48
+    205, 255, 150,  15,     // bright orange             g/r 0.59
+    255, 255, 175,  40      // amber spark — NOT yellow  g/r 0.69
 };
 DEFINE_GRADIENT_PALETTE(pal_water) {
       0,   0,   8,  30,
@@ -141,14 +169,49 @@ struct Params {
   float speechSpread= 0.4f;    // how much loud speech widens the bright zone
   float attack      = 0.5f;    // syllable crispness
   float release     = 0.08f;   // thermal inertia — MOST CHARACTER-DEFINING
-  float gamma       = 2.2f;    // perceptual smoothness
-  uint8_t brightness= 160;
+  // 1.0 = off, and off is correct for this palette. See buildGamma().
+  float gamma       = 1.0f;
+  // Scales the green channel of whatever the palette returned, so it slides the
+  // WHOLE ramp along the red-orange-yellow axis without redefining it. 1.0 is
+  // the palette as authored; 0.75 reads distinctly redder, 1.3 distinctly more
+  // yellow. This exists because that axis is the only thing anyone ever wants to
+  // adjust by eye, and asking for a recompile per attempt makes it unfindable.
+  float yellow      = 1.0f;
+  // Deliberately below half. On a pale surface the failure is almost never "not
+  // bright enough" — it is that the wall blows out and the colour washes to
+  // cream. Less light reads as MORE saturated. Push it up on a dark, matte,
+  // warm-toned surface where it has somewhere to go.
+  uint8_t brightness= 110;
 } P;
 
+// Gamma, and why it defaults to OFF.
+//
+// docs/01 says to apply gamma as the last step before writing pixels, and for
+// smooth *fades* that advice is right. Applied per channel to THIS palette it is
+// wrong, and wrong in a way that looks like a design error rather than a bug:
+//
+//     (200, 50, 0) "orange"  --gamma 2.2-->  (149, 7, 0)   near-pure red
+//     (255,110,10) "flame"   --gamma 2.2-->  (255, 40, 0)  deep red-orange
+//     (255,190,80) "tip"     --gamma 2.2-->  (255,133,20)  merely orange
+//
+// Green is small in every warm colour, and gamma crushes small values hardest,
+// so every entry loses its green and the whole ramp shifts one step redder. The
+// fire came out red with orange peaks instead of orange with red embers.
+//
+// The cause is a space mismatch: gamma DECODE is the right transform for colours
+// authored in sRGB, and this palette — like FastLED's own HeatColors_p — is
+// authored as direct PWM values. Correcting it a second time double-corrects.
+//
+// Left tunable rather than deleted, because the fade-smoothness claim is real
+// and worth testing on the actual surface: `set gamma 2.2` restores the old
+// behaviour for a side-by-side. If banding ever shows up in the low end, the fix
+// is to gamma the INTENSITY while leaving hue alone, not to gamma each channel.
 static uint8_t gammaLUT[256];
 static void buildGamma() {
   for (int i = 0; i < 256; i++)
-    gammaLUT[i] = (uint8_t)(powf(i / 255.0f, P.gamma) * 255.0f + 0.5f);
+    gammaLUT[i] = (P.gamma == 1.0f)
+                    ? (uint8_t)i
+                    : (uint8_t)(powf(i / 255.0f, P.gamma) * 255.0f + 0.5f);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,6 +330,7 @@ static void showParams() {
   Serial.print(F("speechSpread  ")); Serial.println(P.speechSpread, 3);
   Serial.print(F("attack        ")); Serial.println(P.attack, 3);
   Serial.print(F("release       ")); Serial.println(P.release, 3);
+  Serial.print(F("yellow        ")); Serial.println(P.yellow, 3);
   Serial.print(F("gamma         ")); Serial.println(P.gamma, 2);
   Serial.print(F("brightness    ")); Serial.println(P.brightness);
   Serial.print(F("env (live)    ")); Serial.println(env, 3);
@@ -285,6 +349,7 @@ static bool setParam(const String& k, float v) {
   else if (k == "speechSpread") P.speechSpread = v;
   else if (k == "attack")       P.attack       = v;
   else if (k == "release")      P.release      = v;
+  else if (k == "yellow")       P.yellow       = v;
   else if (k == "gamma")      { P.gamma = v; buildGamma(); }
   else if (k == "brightness") { P.brightness = (uint8_t)v;
                                 FastLED.setBrightness(P.brightness); }
@@ -308,6 +373,8 @@ static void handleLine(String line) {
     Serial.println(F("amb <fire|water|storm>"));
     Serial.println(F("speak <seconds>      synthetic speech envelope"));
     Serial.println(F("env <0..1>           hold excitation; 'idle' releases"));
+    Serial.println(F("set yellow 0.8       redder | 1.3 more yellow"));
+    Serial.println(F("set brightness 70    less light reads as MORE saturated"));
     Serial.println(F("idle                 release the hold, stop speaking"));
     Serial.println(F("flare                fire one crackle now"));
     return;
@@ -436,6 +503,10 @@ void loop() {
   // Colour is a function of heat and nothing else, then gamma last.
   for (uint8_t i = 0; i < NUM_LEDS; i++) {
     CRGB c = ColorFromPalette(palette, (uint8_t)(heat[i] * 255.0f), 255, LINEARBLEND);
+    if (P.yellow != 1.0f) {
+      float g = c.g * P.yellow;
+      c.g = (uint8_t)(g < 0.0f ? 0.0f : (g > 255.0f ? 255.0f : g));
+    }
     leds[i] = CRGB(gammaLUT[c.r], gammaLUT[c.g], gammaLUT[c.b]);
   }
   FastLED.show();
