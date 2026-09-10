@@ -240,7 +240,7 @@ static CRGBPalette16 palette = pal_fire;
 struct Params {
   float emberFloor  = 0.12f;   // the fire never goes out
   float breathHz    = 1.1f;    // whole-strip breathing rate — TUNE FIRST
-  float breathDepth = 0.25f;   // how far the breath swings brightness
+  float breathDepth = 0.45f;   // how far the breath swings brightness
   float spaceScale  = 18.0f;   // noise units per pixel; ~3 features across 50
   float timeScale   = 130.0f;  // noise units per second — slow is right
   float flareMeanS  = 3.5f;    // mean seconds between crackles
@@ -252,6 +252,8 @@ struct Params {
   float release     = 0.08f;   // thermal inertia — MOST CHARACTER-DEFINING
   // 1.0 = off, and off is correct for this palette. See buildGamma().
   float gamma       = 1.0f;
+  float onsetGate   = 0.10f;   // below this, an onset is measurement noise
+  float flareGap    = 0.28f;   // seconds; the rate cap that stops the blinking
   // Scales the green channel of whatever the palette returned, so it slides the
   // WHOLE ramp along the red-orange-yellow axis without redefining it. 1.0 is
   // the palette as authored; 0.75 reads distinctly redder, 1.3 distinctly more
@@ -376,9 +378,20 @@ static uint32_t b64decode(const char* in, uint8_t* out, uint32_t outMax) {
     if (n < outMax) out[n++] = (triple >> 8) & 0xFF;
     if (n < outMax) out[n++] = triple & 0xFF;
   }
-  // Trailing '=' means the last group carried fewer than three bytes. The
-  // caller knows the true length from `trk begin`, so trimming here would be
-  // guesswork; it truncates against the declared frame count instead.
+  // The trailing partial group. THIS IS NOT OPTIONAL, and leaving it out is a
+  // bug that hides: a chunk whose length is a multiple of 3 encodes with no
+  // padding and decodes exactly, so it works until it doesn't.
+  //
+  // It cost a whole diagnosis. A 4134-byte envelope ends in an 84-byte chunk —
+  // divisible by 3, no padding — and loaded perfectly. A 4136-byte one ends in
+  // 86 bytes, which pads, and silently arrived 2 bytes short: `trk err short`,
+  // on a transport that had just been proven working with a different track.
+  if (q == 2) {                        // 2 chars -> 1 byte
+    if (n < outMax) out[n++] = (uint8_t)((quad[0] << 2) | (quad[1] >> 4));
+  } else if (q == 3) {                 // 3 chars -> 2 bytes
+    if (n < outMax) out[n++] = (uint8_t)((quad[0] << 2) | (quad[1] >> 4));
+    if (n < outMax) out[n++] = (uint8_t)((quad[1] << 4) | (quad[2] >> 2));
+  }
   return n;
 }
 
@@ -410,7 +423,24 @@ static uint32_t speakStart = 0;
 // silence-shaped noise and the fire crackles continuously through steady
 // speech, which reads as the effect being noisy rather than as the threshold
 // being wrong. Sit clear of the floor.
-static const float ONSET_GATE = 0.06f;
+// MEASURED against the real Tiki greeting, 2026-09-10:
+//
+//     gate 0.02 -> 17.9 flares/sec      gate 0.16 ->  7.6/sec
+//     gate 0.06 -> 13.5 flares/sec      gate 0.25 ->  5.5/sec
+//     words in that greeting            ->  1.28/sec
+//
+// So even a punishing gate asks for four times more crackles than there are
+// words, and 0.06 asks for ten times. That is not a fire responding to speech,
+// it is flicker — which is the same conclusion the Zoltar build reached from the
+// other end, where a servo jaw had to be driven from word starts rather than
+// syllables. There it was a mechanical limit; here there is no load at all and
+// the perceptual limit lands in the same place.
+//
+// The gate alone cannot fix it: the onset channel genuinely has that much
+// structure. What caps the RATE is the refractory below. The real answer is to
+// spawn flares from word starts and leave the envelope to drive the glow —
+// docs/01 §4's "use your word timestamps for structure" — and this holds the
+// line until that track exists.
 
 static void feedSpeech(float dt) {
   float raw = 0.0f;
@@ -435,7 +465,16 @@ static void feedSpeech(float dt) {
       } else {
         raw = trackBuf[f * 2] / 255.0f;
         float on = trackBuf[f * 2 + 1] / 255.0f;
-        if (on > ONSET_GATE) spawnFlare(fminf(1.0f, on * 1.4f));
+        // Gate, then rate-limit. A refractory period is what actually stops the
+        // flicker — see the note at ONSET_GATE. 0.28s caps this at ~3.5/sec
+        // against a word rate of ~1.3/sec, so the loudest attack in each word
+        // wins and the syllables inside it do not each get their own crackle.
+        static uint32_t lastFlareMs = 0;
+        if (on > P.onsetGate &&
+            millis() - lastFlareMs > (uint32_t)(P.flareGap * 1000.0f)) {
+          lastFlareMs = millis();
+          spawnFlare(fminf(1.0f, on * 1.4f));
+        }
       }
     }
   } else if (speakUntil && millis() < speakUntil) {
@@ -476,10 +515,38 @@ static void feedSpeech(float dt) {
   }
 }
 
+// FastLED's inoise8 does NOT use its full range. In practice it clusters around
+// 128 and rarely leaves roughly 50..205, so treating the raw byte as 0..1 gives
+// you about a third of the dynamic range you think you have:
+//
+//     breath  was swinging 0.81..0.94  — a 13% wobble, not a breath
+//     noise   was running  0.24..0.75  — never reaching the top of the palette
+//
+// That is why the fire did not look like it was breathing, and it is very
+// probably why the palette read as too red earlier: heat never got near the
+// bright end, so every judgement about the ramp was made from its bottom third.
+// Stretch it back out before anything else uses it.
+static const float NOISE_LO = 50.0f;
+static const float NOISE_HI = 205.0f;
+
+static float noiseNorm(uint8_t raw) {
+  float v = (raw - NOISE_LO) / (NOISE_HI - NOISE_LO);
+  return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+}
+
 static float heat[NUM_LEDS];
 
 void setup() {
   Serial.begin(115200);
+  // NEVER BLOCK ON A PORT NOBODY IS READING.
+  //
+  // This is USB CDC, not a UART. If no host has the endpoint open, the TX
+  // buffer fills and Serial.println() waits for a reader that will never come —
+  // so the sketch stalls, stops servicing the radio, and looks like a link
+  // fault. It cost a long diagnosis: every track push SUCCEEDED while a serial
+  // monitor was open and FAILED without one, because the monitor was draining
+  // the buffer. A prop in a tiki has nothing attached.
+  Serial.setTxTimeoutMs(0);
   uint32_t t0 = millis();
   while (!Serial && millis() - t0 < 1500) { delay(10); }
 
@@ -521,6 +588,8 @@ static void showParams() {
   Serial.print(F("attack        ")); Serial.println(P.attack, 3);
   Serial.print(F("release       ")); Serial.println(P.release, 3);
   Serial.print(F("yellow        ")); Serial.println(P.yellow, 3);
+  Serial.print(F("onsetGate     ")); Serial.println(P.onsetGate, 3);
+  Serial.print(F("flareGap      ")); Serial.println(P.flareGap, 3);
   Serial.print(F("gamma         ")); Serial.println(P.gamma, 2);
   Serial.print(F("brightness    ")); Serial.println(P.brightness);
   Serial.print(F("env (live)    ")); Serial.println(env, 3);
@@ -540,6 +609,8 @@ static bool setParam(const String& k, float v) {
   else if (k == "attack")       P.attack       = v;
   else if (k == "release")      P.release      = v;
   else if (k == "yellow")       P.yellow       = v;
+  else if (k == "onsetGate")    P.onsetGate    = v;
+  else if (k == "flareGap")     P.flareGap     = v;
   else if (k == "gamma")      { P.gamma = v; buildGamma(); }
   else if (k == "brightness") { P.brightness = (uint8_t)v;
                                 FastLED.setBrightness(P.brightness); }
@@ -799,7 +870,14 @@ void loop() {
   if (rxPending) {
     String line(rxBuf);
     rxPending = false;
-    Serial.print(F("rf> ")); Serial.println(line);
+    // Echo the verb, not the payload. A track chunk is ~215 characters and
+    // there are 28 of them; echoing the lot is 6 kB of USB traffic during the
+    // one operation that must not be interrupted.
+    if (line.startsWith("trk d ")) {
+      Serial.print(F("rf> ")); Serial.println(line.substring(0, 12));
+    } else {
+      Serial.print(F("rf> ")); Serial.println(line);
+    }
     linkReplied = false;
     handleLine(line);
     // Only ack when the command did not already answer for itself. `st` sends
@@ -820,7 +898,7 @@ void loop() {
   // Layer 1 — breath. One value for the whole strip. Low-frequency noise rather
   // than a sine, because a periodic breath is audible to the eye as a loop.
   uint16_t bz = (uint16_t)(tSec * P.breathHz * 256.0f);
-  float breathRaw = inoise8(0, bz) / 255.0f;
+  float breathRaw = noiseNorm(inoise8(0, bz));
   float breath = (1.0f - P.breathDepth) + P.breathDepth * breathRaw;
 
   // Speech agitates the fire as well as brightening it: zones widen and drift
@@ -857,7 +935,7 @@ void loop() {
   // Layer 2 — correlated spatial noise, then the whole expression.
   uint16_t tz = (uint16_t)(tSec * timeScale);
   for (uint8_t i = 0; i < NUM_LEDS; i++) {
-    float n = inoise8((uint16_t)(i * spaceScale), tz) / 255.0f;
+    float n = noiseNorm(inoise8((uint16_t)(i * spaceScale), tz));
     float h = (n + flareField[i]) * breath * (1.0f + P.speechGain * env);
     heat[i] = h < P.emberFloor ? P.emberFloor : (h > 1.0f ? 1.0f : h);
   }

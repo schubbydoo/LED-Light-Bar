@@ -78,6 +78,15 @@ static bool linkSend(const String& s) {
 
 void setup() {
   Serial.begin(115200);
+  // NEVER BLOCK ON A PORT NOBODY IS READING.
+  //
+  // This is USB CDC, not a UART. If no host has the endpoint open, the TX
+  // buffer fills and Serial.println() waits for a reader that will never come —
+  // so the sketch stalls, stops servicing the radio, and looks like a link
+  // fault. It cost a long diagnosis: every track push SUCCEEDED while a serial
+  // monitor was open and FAILED without one, because the monitor was draining
+  // the buffer. A prop in a tiki has nothing attached.
+  Serial.setTxTimeoutMs(0);
   uint32_t t0 = millis();
   while (!Serial && millis() - t0 < 1500) { delay(10); }
 
