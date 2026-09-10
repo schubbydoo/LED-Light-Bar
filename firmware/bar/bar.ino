@@ -71,6 +71,9 @@
 */
 
 #include <FastLED.h>
+#include <WiFi.h>
+#include <esp_now.h>
+#include <esp_wifi.h>
 
 #define DATA_PIN      D10
 #define NUM_LEDS      50
@@ -84,6 +87,76 @@ static const uint8_t  FPS = 100;
 static const uint32_t FRAME_US = 1000000UL / FPS;
 
 CRGB leds[NUM_LEDS];
+
+// ---------------------------------------------------------------------------
+// The link.
+//
+// ESP-NOW delivers TEXT LINES, and they go into the same `handleLine()` the
+// serial port uses. So every command this sketch understands works over the
+// radio too, with no second protocol to keep in step and no second parser to
+// drift. `amb water` typed at the bridge does exactly what `amb water` typed
+// here does.
+//
+// Both ends must be on the same channel. Neither is associated with an access
+// point, so nothing negotiates it — it is fixed at both ends and must match.
+// A mismatch is not an error: the send succeeds and the delivery callback
+// reports failure, which reads as "the other board is off".
+// ---------------------------------------------------------------------------
+static uint8_t PEER_BRIDGE[6] = {0xF0, 0x9E, 0x9E, 0xB2, 0x3D, 0x38};
+static const uint8_t LINK_CHANNEL = 1;
+static bool linkUp = false;
+
+static void handleLine(String line);          // fwd
+
+// Set whenever a handler has already answered by air, so the generic ack below
+// does not fire a second packet on its heels.
+//
+// ESP-NOW sends are asynchronous. Queuing a second before the first has
+// completed loses BOTH — which showed up as `st` replying perfectly over serial
+// and saying nothing at all over the radio, while the delivery callback still
+// reported success. One reply per received line.
+static bool linkReplied = false;
+
+static void linkSend(const String& s) {
+  if (!linkUp) return;
+  esp_now_send(PEER_BRIDGE, (const uint8_t*)s.c_str(), s.length());
+  linkReplied = true;
+}
+
+// The radio callback runs in WiFi task context, so it must not touch FastLED or
+// block. Copy the line out and let loop() act on it.
+static volatile bool  rxPending = false;
+static char           rxBuf[200];
+static volatile int   rxLen = 0;
+
+static void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len) {
+  if (rxPending) return;                       // drop rather than tear a line
+  if (len > (int)sizeof(rxBuf) - 1) len = sizeof(rxBuf) - 1;
+  memcpy(rxBuf, data, len);
+  rxBuf[len] = 0;
+  rxLen = len;
+  rxPending = true;
+}
+
+static void linkBegin() {
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  esp_wifi_set_channel(LINK_CHANNEL, WIFI_SECOND_CHAN_NONE);
+  if (esp_now_init() != ESP_OK) {
+    Serial.println(F("ESP-NOW init FAILED — serial still works"));
+    return;
+  }
+  esp_now_register_recv_cb(onRecv);
+  esp_now_peer_info_t peer = {};
+  memcpy(peer.peer_addr, PEER_BRIDGE, 6);
+  peer.channel = LINK_CHANNEL;
+  peer.encrypt = false;
+  if (esp_now_add_peer(&peer) != ESP_OK) {
+    Serial.println(F("could not add bridge as peer"));
+    return;
+  }
+  linkUp = true;
+}
 
 // ---------------------------------------------------------------------------
 // Ambience — the light equivalent of the ambient audio voice.
@@ -303,11 +376,15 @@ void setup() {
   FastLED.setBrightness(P.brightness);
   buildGamma();
   random16_set_seed((uint16_t)esp_random());
+  linkBegin();
 
   Serial.println();
   Serial.println(F("=== light bar — ambience renderer ========================"));
   Serial.print  (F("ambience : ")); Serial.println(AMBIENCES[ambIndex].name);
   Serial.print  (F("pixels   : ")); Serial.println(NUM_LEDS);
+  Serial.print  (F("my MAC   : ")); Serial.println(WiFi.macAddress());
+  Serial.print  (F("link     : "));
+  Serial.println(linkUp ? F("ESP-NOW up, ch 1") : F("DOWN — serial only"));
   Serial.println(F("commands : show | set <k> <v> | amb <name> | speak <s> |"));
   Serial.println(F("           env <0..1> | idle | help"));
   Serial.println(F("Idle is speech with a zero envelope — there is no mode."));
@@ -367,8 +444,28 @@ static void handleLine(String line) {
 
   if (verb == "show" || verb == "get") { showParams(); return; }
 
+  // A one-line state summary, and the only reply that goes back over the radio.
+  //
+  // It exists because reading the bar's state over its own serial port is
+  // self-defeating: opening that port reboots the C3, so what you read back is
+  // always the compiled defaults, not what you just set. Over the radio the bar
+  // is never interrupted, so `st` is the only honest way to ask it anything.
+  if (verb == "st") {
+    String out = "st amb=" + String(AMBIENCES[ambIndex].name)
+               + " y=" + String(P.yellow, 2)
+               + " br=" + String(P.brightness)
+               + " breath=" + String(P.breathHz, 2)
+               + " rel=" + String(P.release, 3)
+               + " gain=" + String(P.speechGain, 2)
+               + " env=" + String(env, 2);
+    Serial.println(out);
+    linkSend(out);
+    return;
+  }
+
   if (verb == "help") {
-    Serial.println(F("show                 every live parameter"));
+    Serial.println(F("show                 every live parameter (serial only)"));
+    Serial.println(F("st                   one-line state, answers over the radio"));
     Serial.println(F("set <key> <value>    change one (see show for keys)"));
     Serial.println(F("amb <fire|water|storm>"));
     Serial.println(F("speak <seconds>      synthetic speech envelope"));
@@ -444,6 +541,20 @@ static void pollSerial() {
 void loop() {
   static uint32_t lastUs = micros();
   pollSerial();
+
+  // A line off the radio. Same parser, same effect — the transport is not the
+  // renderer's business. The ack is what lets the box know a cue landed, which
+  // a one-way 433 channel could never do.
+  if (rxPending) {
+    String line(rxBuf);
+    rxPending = false;
+    Serial.print(F("rf> ")); Serial.println(line);
+    linkReplied = false;
+    handleLine(line);
+    // Only ack when the command did not already answer for itself. `st` sends
+    // its own state; everything else gets this.
+    if (!linkReplied) linkSend("ack " + line);
+  }
 
   uint32_t nowUs = micros();
   if (nowUs - lastUs < FRAME_US) return;

@@ -29,33 +29,58 @@ MAC_BRIDGE="F0:9E:9E:B2:3D:38"
 
 target="${1:-}"
 shift || true
-cmd="${*:-}"
 
 case "$target" in
     bar)    mac="$MAC_BAR" ;;
     bridge) mac="$MAC_BRIDGE" ;;
     *)      echo "usage: ./send.sh {bar|bridge} <command>" >&2; exit 2 ;;
 esac
-[[ -n "$cmd" ]] || { echo "nothing to send" >&2; exit 2; }
+[[ $# -gt 0 ]] || { echo "nothing to send" >&2; exit 2; }
 port="/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_${mac}-if00"
 
-ssh -i "$BOX_KEY" "$BOX" "$PY - '$port' '$cmd'" <<'PY'
+# Every command in ONE connection. Each new connection to the bar reboots it —
+# the C3's native USB-JTAG resets the chip on connect — so a second invocation
+# would find the compiled defaults again. Over the radio this does not apply.
+printf -v _args '%q ' "$@"
+ssh -i "$BOX_KEY" "$BOX" "$PY - '$port' $_args" <<'PY'
 import sys, time, serial
 
-port, cmd = sys.argv[1], sys.argv[2]
-p = serial.Serial(port, 115200, timeout=0.2)
-# Never assert the control lines. On the C3's native USB that can drop the chip
-# into its download stub, which looks exactly like a hang.
-p.setDTR(False)
-p.setRTS(False)
+port, cmds = sys.argv[1], sys.argv[2:]
+# Set DTR and RTS low BEFORE opening. pyserial asserts them during open(), and
+# on the C3's native USB that pulses the board into a reset — so clearing them
+# afterwards is too late, the reboot has already happened.
+#
+# This mattered more than it sounds. Every `send.sh bar "set ..."` was resetting
+# the fire to its compiled defaults and then applying one value, so only ever one
+# setting was in force and the live-tuning loop did not actually work.
+p = serial.Serial()
+p.port = port
+p.baudrate = 115200
+p.timeout = 0.2
+p.dtr = False
+p.rts = False
+p.open()
 
+# Let the board finish rebooting BEFORE writing anything.
+#
+# Opening the port resets the C3, and a command written into that window sits in
+# a buffer until some later session drains it. The symptom is replies that lag
+# one command behind — you ask for the state and get the ack for whatever you
+# sent last time, which reads as the link being slow rather than as the command
+# never having been delivered. Wait for the boot, then clear whatever the boot
+# printed, then send.
+time.sleep(1.2)
 p.reset_input_buffer()
-p.write((cmd + "\n").encode())
-p.flush()
 
-# Read for a moment. Most replies are one line; `show` is a dozen.
+for c in cmds:
+    p.write((c + "\n").encode())
+    p.flush()
+    time.sleep(0.35)
+
+# Read long enough for a round trip out to the bar and back, not just for the
+# bridge's own acknowledgement.
 t0 = time.time()
-while time.time() - t0 < 1.5:
+while time.time() - t0 < 2.0:
     line = p.readline()
     if not line:
         continue

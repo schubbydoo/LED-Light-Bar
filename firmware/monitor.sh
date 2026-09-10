@@ -41,11 +41,21 @@ port, secs, raw = sys.argv[1], float(sys.argv[2]), sys.argv[3] == "raw"
 NOISE = ("src/", "ESP-ROM", "Build:", "rst:", "Saved PC", "SPIWP", "mode:",
          "load:", "entry ", "clk_drv", "configsip")
 
-p = serial.Serial(port, 115200, timeout=1)
-# Leave the control lines alone. Asserting them on a C3's native USB can drop
-# the board into the download stub, which looks like a hang.
-p.setDTR(False)
-p.setRTS(False)
+# Control lines low BEFORE open, not after — pyserial asserts them during
+# open(). This does not stop the reboot on its own (connecting at all resets
+# the C3's native USB-JTAG) but it avoids the worse case of landing in the
+# download stub, which looks exactly like a hang.
+#
+# Accept that opening this port reboots the board. For reading a banner that
+# is fine. To observe LIVE state, ask over the radio instead — `send.sh bridge
+# st` — because the bar is never interrupted by a command that arrives by air.
+p = serial.Serial()
+p.port = port
+p.baudrate = 115200
+p.timeout = 1
+p.dtr = False
+p.rts = False
+p.open()
 
 t0 = time.time()
 try:

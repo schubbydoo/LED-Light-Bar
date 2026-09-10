@@ -82,7 +82,17 @@ fi
 
 echo "==> shipping $(du -h "$image" | cut -f1) to $BOX"
 ssh -i "$BOX_KEY" "$BOX" "mkdir -p ~/$REMOTE_DIR"
-scp -q -i "$BOX_KEY" "$image" "$BOX:~/$REMOTE_DIR/$(basename "$image")"
+# Retry once. A 1.1 MB transfer failed with "Connection closed" exactly once
+# and the flash silently did not happen — the board kept running its old
+# firmware while everything downstream looked like a code fault. `set -e` DID
+# abort this script correctly; what hid it was piping the script through
+# `tail`, because a pipeline's exit status is the LAST command's.
+# Do not pipe this script. Redirect it.
+scp -q -i "$BOX_KEY" "$image" "$BOX:~/$REMOTE_DIR/$(basename "$image")" || {
+    echo "==> transfer failed, retrying once" >&2
+    sleep 2
+    scp -q -i "$BOX_KEY" "$image" "$BOX:~/$REMOTE_DIR/$(basename "$image")"
+}
 
 echo "==> flashing $target ($mac) at $offset"
 ssh -i "$BOX_KEY" "$BOX" \

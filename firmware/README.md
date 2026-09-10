@@ -9,7 +9,7 @@ Two sketches, two ends of one radio link, versioned together — see the note in
 | `bringup/` | Five staged hardware questions, with the strip attached. |
 | `pixelcheck/` | Whole-strip primaries and fixed markers, held. For when `bringup` raises a question about one pixel or one channel — it removes motion from the answer. |
 | `bar/` | The light bar — the ambience renderer. **Tunable live over serial.** |
-| `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW. Not started. |
+| `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW. **Working.** |
 
 ---
 
@@ -58,11 +58,37 @@ belong on a machine whose day job is running a prop.
 ./monitor.sh bar 30             # ...for 30 seconds
 ./monitor.sh bar 30 raw         # ...keeping the boot ROM and FastLED chatter
 
-./send.sh bar show              # every live parameter
+./send.sh bridge "amb water"    # over the AIR — this is the one you want
+./send.sh bridge st             # one-line state, answered over the air
+./send.sh bar show              # every live parameter (resets the board, see below)
 ./send.sh bar "set breath 1.4"  # change one and watch it happen
 ./send.sh bar "speak 4"         # synthetic speech envelope, no radio needed
 ./send.sh bar "env 0.8"         # hold excitation, to judge the top end
 ```
+
+### Tune over the RADIO, not over the bar's serial
+
+**Opening the bar's serial port reboots it.** The C3's native USB-JTAG resets the
+chip on connect, so every separate `send.sh bar "set ..."` applies one value to a
+fresh set of compiled defaults and loses whatever came before. The live-tuning
+loop does not work that way and never did.
+
+Send through the bridge instead. That resets the *bridge*, which has no state
+worth keeping, and the bar is never interrupted — so settings accumulate:
+
+```
+./send.sh bridge "set yellow 0.75"
+./send.sh bridge "set brightness 90"
+./send.sh bridge st
+   bar> st amb=fire y=0.75 br=90 breath=1.10 rel=0.080 gain=1.20 env=0.00
+```
+
+`st` is the only reply that comes back over the air, and it exists because
+`show` cannot: reading the bar's own serial to check what you just set reboots it
+first, so the answer is always the defaults.
+
+Several commands in one connection also works — `send.sh bar "set a 1" "set b 2"
+st` — which is the workaround when the radio is not an option.
 
 **A compile is 60-90 s, which is why `send.sh` exists.** The fire has thirteen
 parameters and every one is judged by eye; reflashing to try a number breaks the
