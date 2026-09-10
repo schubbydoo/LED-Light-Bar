@@ -173,6 +173,48 @@ an unpowered buffer pushes current through the input's clamp diode into a dead
 VCC net, which TI rates at 20 mA and a bare GPIO can exceed. Small risk, free to
 avoid: **power the TalentCell before or with USB, never after.**
 
+## The speech protocol
+
+Text over the link, base64 for the bulk. Everything except the track is small and infrequent.
+
+```
+trk begin <clip> <frames>      start a load; clears whatever was there
+trk d <seq> <base64>           one chunk — 150 raw bytes, sequence CHECKED
+trk end                        -> "trk ok <clip> <frames>" or "trk err ..."
+
+cue <clip> <position_ms> <lead_ms>    at ACTUAL playback start
+pos <position_ms>                     every ~2s; the bar EASES toward it
+stop                                  release to idle
+```
+
+**The track is resident before playback starts and is never streamed.** 2 bytes per frame at
+50 Hz is 100 B/s, so a 41 s greeting is 4.1 kB in 28 chunks. During the performance the link
+carries a cue, a position update every couple of seconds, and nothing else — so packet loss
+during a greeting is not a failure mode that exists.
+
+**`cue` carries the position read from the playback handle at real playback start**, not from
+when the engine decided to play. That is the whole of spec §5.7's one-clock rule. Measured at
+±55 ms across 41 s with no accumulation.
+
+Three things guard the transfer, and each caught a real bug:
+
+- **the sequence number is checked against the byte offset**, not trusted — a dropped or short
+  chunk shifts every later frame earlier and produces a track that plays perfectly and is
+  silently out of time, which looks like bad sync rather than a lost packet
+- **`trk end` verifies the byte count** — this caught a base64 decoder that dropped trailing
+  partial groups, which worked by luck for any track whose last chunk was a multiple of 3
+- **`push_track` requires a confirmation AND the absence of any error** — it once reported
+  success beside a `trk err` in its own reply list
+
+### THE TRACK LIVES IN RAM
+
+**Any reflash or power cycle wipes it.** Re-push after flashing. In the field a battery blip
+means a silently dark bar with no explanation — persisting it to flash is the most important
+unbuilt thing here.
+
+Corollary that cost a long diagnosis: **opening the bar's serial port reboots the C3**, so
+`monitor.sh bar` destroys the track you were about to test. Use `send.sh bridge st` instead.
+
 ## Status
 
 **Both sketches compile and run on the bar board, 2026-09-10.** The board boots,
@@ -182,4 +224,10 @@ amber load. But **no strip has been connected yet**, so what any of it *looks*
 like is still unknown, and the load stage so far proves only that the sketch does
 not reset the board on its own.
 
-**bar/ and bridge/: empty.** Next.
+**The full chain works and the effect is approved** (2026-09-10): the Tiki greeting plays,
+the bar renders words in red over a breathing fire, and the two clocks agree to ±55 ms.
+Compiled defaults are the approved values — `flashHue 0`, `flash 0.6`, `blackout 0.6`.
+
+**Next, in order:** persist the track to flash; re-judge the palette on matte warm card;
+then a `PIXEL` channel kind and a flow step on the box so this runs from the Show page
+rather than from an SSH session.

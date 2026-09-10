@@ -246,13 +246,64 @@ struct Params {
   float flareMeanS  = 3.5f;    // mean seconds between crackles
   float flareRelease= 0.6f;    // seconds for a crackle to fade
   float flareWidth  = 4.0f;    // pixels, gaussian sigma
-  float speechGain  = 1.2f;    // how hard speech drives the fire
+  // Lower than it was. Red now carries the speech, so the heat surge only has
+  // to keep the fire alive underneath rather than be the signal itself — the
+  // brief was "the underlying fire breathing" with red on top, not a fire that
+  // doubles in brightness on every word.
+  float speechGain  = 0.6f;    // how hard speech drives the fire
   float speechSpread= 0.4f;    // how much loud speech widens the bright zone
   float attack      = 0.5f;    // syllable crispness
   float release     = 0.08f;   // thermal inertia — MOST CHARACTER-DEFINING
   // 1.0 = off, and off is correct for this palette. See buildGamma().
   float gamma       = 1.0f;
   float onsetGate   = 0.10f;   // below this, an onset is measurement noise
+  // THE WORD FLASH. A heat surge moves along the palette, so a word arrives as
+  // "somewhat more orange" — true to how a fire behaves and, watching it, not
+  // distinct enough to read as speech. This pulses the WHOLE STRIP toward
+  // saturated red on each word start: a hue change and a brightness change at
+  // once, against an orange bed, which is very hard to miss.
+  //
+  // docs/01 §4 anticipated exactly this choice — build the heat-surge version,
+  // try the red-flash version, keep whichever wins on the real surface. 0 turns
+  // it off and leaves the pure heat mapping.
+  // 0.6, not 0.9 — approved on the prop 2026-09-10. At 0.9 the speech colour
+  // very nearly replaces the fire and reads as a separate light switching on;
+  // at 0.6 the flame shows through it, so the bright parts of the fire come
+  // through warmer than the dim parts and the strip keeps its own life while a
+  // word is lit. "The fire goes red", not "a red light turns on".
+  float flash       = 0.60f;   // how much of the speech colour a word mixes in
+  // The speech colour, as a FastLED hue. Blue by default — not what a fire does,
+  // and worth trying anyway: against a warm orange bed a cold hue is the largest
+  // possible contrast, so a word reads at a glance rather than as a brightness
+  // change on the same ramp. docs/01's rule is to keep whichever wins on the
+  // real surface, and that argument does not care which colour won.
+  //
+  //     0 red    32 orange   64 yellow   96 green
+  //   128 aqua  160 blue    192 purple  224 pink
+  float flashHue    = 0.0f;    // red
+  // BLACKOUT BETWEEN WORDS — but only while a track is playing.
+  //
+  // This deliberately breaks the ember-floor rule for the duration of a
+  // greeting: docs/01 keeps the fire lit because "dark reads as a fault, not a
+  // fire", and that is right for an unattended prop. During speech the reading
+  // is different — the strip is not failing, it is punctuating, and a guest who
+  // just heard a voice has every reason to read darkness as deliberate.
+  //
+  // The IDLE fire is untouched. Between greetings the bar still breathes, so the
+  // prop never sits dark on its own. 1.0 = fully dark between words, 0 = the
+  // fire keeps burning underneath as before.
+  // 0.6, not 1.0 — approved on the prop 2026-09-10. Full blackout made the
+  // gaps emphatic but left the greeting's 14s of drums completely dark before
+  // the first word, which reads as a broken prop rather than as one waiting.
+  // 0.6 keeps a low fire alive through the intro and still drops hard enough
+  // between words to punctuate them.
+  float blackout    = 0.6f;
+  float flashDecay  = 0.10f;   // seconds for red to leave after a word ends
+  // Spawn a crackle at each word start as well. OFF: with red already marking
+  // every word, the flares on top read as "too much flashing" — two events for
+  // one word. Kept because a crackle on an emphasised word may earn its place
+  // once the red is tuned.
+  float wordFlare   = 0.0f;
   float flareGap    = 0.28f;   // seconds; the rate cap that stops the blinking
   // Scales the green channel of whatever the palette returned, so it slides the
   // WHOLE ramp along the red-orange-yellow axis without redefining it. 1.0 is
@@ -410,6 +461,16 @@ static int32_t trackPosMs() {
 // Tomorrow they come off the radio. Nothing below this line will change when
 // they do — which is the point of keeping the renderer ignorant of transport.
 // ---------------------------------------------------------------------------
+// Red is ON for the DURATION of a word and off between words — driven by the
+// track's LEVEL channel, not its onset. Triggering on the attack and decaying on
+// a timer is a hit, and reads as flashing; a word is a span, and lighting the
+// span reads as the word being spoken.
+//
+// It gets its own release rather than borrowing the fire's thermal inertia,
+// because the two want opposite things: the fire should settle slowly, the red
+// should leave cleanly so the gaps between words are genuinely dark.
+static float flashLevel = 0.0f;   // 0..1, follows the word span
+static float trackLevel = 0.0f;   // raw level from the track, this frame
 static float env = 0.0f;          // smoothed
 static float envTarget = 0.0f;    // raw, before asymmetric smoothing
 static float envHold = -1.0f;     // >=0 means a manual hold is in force
@@ -447,8 +508,10 @@ static void feedSpeech(float dt) {
 
   // Priority: a manual hold, then a real track, then the synthetic stand-in.
   // The track wins over `speak` so a cue arriving mid-demo does the right thing.
+  trackLevel = 0.0f;
   if (envHold >= 0.0f) {
     raw = envHold;
+    trackLevel = envHold;
   } else if (playing) {
     int32_t pos = trackPosMs();
     if (pos < 0) {
@@ -464,16 +527,17 @@ static void feedSpeech(float dt) {
         Serial.println(F("track: finished"));
       } else {
         raw = trackBuf[f * 2] / 255.0f;
+        trackLevel = raw;                 // red follows this, not the onset
         float on = trackBuf[f * 2 + 1] / 255.0f;
         // Gate, then rate-limit. A refractory period is what actually stops the
         // flicker — see the note at ONSET_GATE. 0.28s caps this at ~3.5/sec
         // against a word rate of ~1.3/sec, so the loudest attack in each word
         // wins and the syllables inside it do not each get their own crackle.
         static uint32_t lastFlareMs = 0;
-        if (on > P.onsetGate &&
+        if (P.wordFlare > 0.0f && on > P.onsetGate &&
             millis() - lastFlareMs > (uint32_t)(P.flareGap * 1000.0f)) {
           lastFlareMs = millis();
-          spawnFlare(fminf(1.0f, on * 1.4f));
+          spawnFlare(fminf(1.0f, on * 1.4f * P.wordFlare));
         }
       }
     }
@@ -589,6 +653,11 @@ static void showParams() {
   Serial.print(F("release       ")); Serial.println(P.release, 3);
   Serial.print(F("yellow        ")); Serial.println(P.yellow, 3);
   Serial.print(F("onsetGate     ")); Serial.println(P.onsetGate, 3);
+  Serial.print(F("flash         ")); Serial.println(P.flash, 3);
+  Serial.print(F("flashDecay    ")); Serial.println(P.flashDecay, 3);
+  Serial.print(F("wordFlare     ")); Serial.println(P.wordFlare, 3);
+  Serial.print(F("flashHue      ")); Serial.println(P.flashHue, 0);
+  Serial.print(F("blackout      ")); Serial.println(P.blackout, 2);
   Serial.print(F("flareGap      ")); Serial.println(P.flareGap, 3);
   Serial.print(F("gamma         ")); Serial.println(P.gamma, 2);
   Serial.print(F("brightness    ")); Serial.println(P.brightness);
@@ -610,6 +679,11 @@ static bool setParam(const String& k, float v) {
   else if (k == "release")      P.release      = v;
   else if (k == "yellow")       P.yellow       = v;
   else if (k == "onsetGate")    P.onsetGate    = v;
+  else if (k == "flash")        P.flash        = v;
+  else if (k == "flashDecay")   P.flashDecay   = v;
+  else if (k == "wordFlare")    P.wordFlare    = v;
+  else if (k == "flashHue")     P.flashHue     = v;
+  else if (k == "blackout")     P.blackout     = v;
   else if (k == "flareGap")     P.flareGap     = v;
   else if (k == "gamma")      { P.gamma = v; buildGamma(); }
   else if (k == "brightness") { P.brightness = (uint8_t)v;
@@ -893,6 +967,17 @@ void loop() {
 
   feedSpeech(dt);
 
+  // Red tracks the word span: on almost immediately, off on its own release.
+  // Asymmetric for the same reason the envelope is — a word should light without
+  // a visible ramp, and leave without a smear into the gap.
+  if (trackLevel > flashLevel) {
+    flashLevel += (trackLevel - flashLevel) * 0.6f;
+  } else {
+    float k = 1.0f - expf(-dt / fmaxf(0.02f, P.flashDecay));
+    flashLevel += (trackLevel - flashLevel) * k;
+  }
+  if (flashLevel < 0.004f) flashLevel = 0.0f;
+
   float tSec = millis() / 1000.0f;
 
   // Layer 1 — breath. One value for the whole strip. Low-frequency noise rather
@@ -943,6 +1028,23 @@ void loop() {
   // Colour is a function of heat and nothing else, then gamma last.
   for (uint8_t i = 0; i < NUM_LEDS; i++) {
     CRGB c = ColorFromPalette(palette, (uint8_t)(heat[i] * 255.0f), 255, LINEARBLEND);
+    // Blend toward a bright saturated red for the word flash. Applied before
+    // the yellow trim and the gamma table so it goes through the same output
+    // path as everything else rather than becoming a second way to write a pixel.
+    if (flashLevel > 0.01f && P.flash > 0.0f) {
+      uint8_t mix = (uint8_t)(fminf(1.0f, flashLevel * P.flash) * 255.0f);
+      // Full saturation and value: the point is contrast against the bed, and a
+      // desaturated speech colour just reads as the fire getting paler.
+      c = blend(c, CRGB(CHSV((uint8_t)P.flashHue, 255, 255)), mix);
+    }
+    // Everything off between words, while and only while a track is playing.
+    // Applied last, as a master scale, so it dims the fire and the speech colour
+    // together rather than becoming a second way to decide what a pixel is.
+    if (playing && P.blackout > 0.0f) {
+      float keep = 1.0f - P.blackout * (1.0f - flashLevel);
+      if (keep < 0.0f) keep = 0.0f;
+      c.nscale8_video((uint8_t)(keep * 255.0f));
+    }
     if (P.yellow != 1.0f) {
       float g = c.g * P.yellow;
       c.g = (uint8_t)(g < 0.0f ? 0.0f : (g > 255.0f ? 255.0f : g));

@@ -120,7 +120,7 @@ single-pixel test, not the fire renderer. If that first test shows nothing at al
 prior suspect is **pin 1 (1OE) not actually at GND** — the buffer's output sits high-impedance
 and everything looks correct.
 
-**Firmware: written, running, untuned.** `bar/` implements docs/01's four-layer model — ember
+**Firmware: written, running, and the effect is approved.** `bar/` implements docs/01's four-layer model — ember
 floor, whole-strip breath, correlated spatial noise, Poisson flares — with colour a pure function
 of heat and gamma applied last.
 
@@ -133,10 +133,52 @@ crossfade, and no state to get wrong. Idle is speech with a zero envelope. Anyon
 a second renderer and blend between them should read docs/01 §4 first: that change turns a fire
 that speaks into a lamp on a dimmer, and no parameter recovers it.
 
-What has NOT happened: nobody has judged how it looks. Per docs/01 §10, that has to be in real
-darkness, at real viewing distance, on the real surface — a bench under room lights will mislead
-you completely. Tune `breathHz` first (the dominant cue) and `release` second (thermal inertia,
-the most character-defining number).
+## The effect as approved, 2026-09-10
+
+The greeting drives the bar end to end: envelope generated on the Pi, pushed over ESP-NOW,
+cued against the playback handle. **Sync measured at ±55ms across a 41s greeting with no
+accumulation** — spec asks for ~50ms.
+
+**Speech is driven by WORD BOUNDARIES, not loudness.** This is the single most important
+decision here and it was reached twice independently. An RMS envelope of the real greeting
+asks for **13.5 flares/sec against a word rate of 1.28** — flicker, not speech. Separately,
+the Zoltar build had to drive its servo jaw from word starts rather than syllables. And a
+third argument settles it: that greeting opens with ~14s of drums, and band-limited RMS
+**cannot tell them from voice** (level 76 vs 101, nearly as many onsets). A word is a word;
+a drum is not.
+
+The renderer needed no change for that. It steps whatever track it is given, so the BOX
+decides what drives the fire by shaping the track — `envelope.word_track()` on that side.
+Keep it that way: the bar must stay ignorant of speech.
+
+**What a word does, as approved:**
+
+- red (`flashHue 0`) mixed at `flash 0.6` — the flame shows through, so it reads as *the fire
+  going red* rather than *a red light turning on*
+- red follows the word's **span**, not its attack. Triggering on the onset and decaying on a
+  timer is a hit, and reads as flashing
+- `blackout 0.6` between words — the fire dims to 40% in the gaps, punctuating them, while
+  still leaving a low fire alive through the 14s intro. Full blackout made the intro read as
+  a broken prop rather than a waiting one
+- crackles OFF (`wordFlare 0`) — red plus a flare was two events for one word
+
+**Idle is untouched by any of that.** Between greetings the fire breathes normally and the
+blackout does not apply, so the bar never sits dark on its own.
+
+## Still to judge
+
+**The palette has never been assessed fairly.** Both earlier adjustments were made while the
+fire was rendering in a third of its range (see the `inoise8` note below), and only ever
+against a **white wall** — which docs/01 §2 names as the surface that will mislead you. Redo
+it on matte, warm-toned card before touching the ramp again.
+
+## The trap that distorted everything before it
+
+**FastLED's `inoise8` does not use its full range** — it clusters around 128 and rarely leaves
+roughly 50..205. Treating the raw byte as 0..1 gave a breath swinging 0.81..0.94 (a wobble,
+not a breath) and noise running 0.24..0.75 that never reached the top of the palette. The fire
+rendered in about a third of its intended range for the whole first day, which is also why the
+palette read as wrong in both directions. `noiseNorm()` stretches it back.
 
 ### Reading the diagrams
 
