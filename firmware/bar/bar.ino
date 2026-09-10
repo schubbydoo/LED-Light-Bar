@@ -117,6 +117,14 @@ static void handleLine(String line);          // fwd
 // reported success. One reply per received line.
 static bool linkReplied = false;
 
+// Mark a line answered without answering. Some commands must NOT reply: a
+// track load is 28 chunks and a position update arrives every 2s, and acking
+// those floods the link — which is not merely noisy, it LOSES packets, because
+// ESP-NOW sends are asynchronous and one queued on top of another takes both
+// down. The first track push failed exactly this way: all 28 chunks arrived and
+// the `trk end` confirmation was lost among the acks they provoked.
+static void linkQuiet() { linkReplied = true; }
+
 static void linkSend(const String& s) {
   if (!linkUp) return;
   esp_now_send(PEER_BRIDGE, (const uint8_t*)s.c_str(), s.length());
@@ -126,7 +134,7 @@ static void linkSend(const String& s) {
 // The radio callback runs in WiFi task context, so it must not touch FastLED or
 // block. Copy the line out and let loop() act on it.
 static volatile bool  rxPending = false;
-static char           rxBuf[200];
+static char           rxBuf[250];
 static volatile int   rxLen = 0;
 
 static void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len) {
@@ -306,6 +314,80 @@ static void spawnFlare(float amp, float atPos = -1.0f) {
 }
 
 // ---------------------------------------------------------------------------
+// The envelope track, and the clock that steps it.
+//
+// The track is RESIDENT before playback starts. It is never streamed. 2 bytes
+// per frame at 50 Hz is 100 B/s, so a 41 s greeting is 4.1 kB — one burst at
+// provisioning time. During the performance the link carries a cue, a position
+// update every couple of seconds, and nothing else, which means **packet loss
+// during a greeting is not a failure mode that exists**. Streaming would put a
+// radio on the show's critical path for the whole line to save 4 kB.
+//
+// THE CLOCK IS THE BOX'S, NOT OURS. `cue` carries the position read from the
+// playback handle at *actual* playback start, and everything here derives from
+// that. This is the one rule §5.7 exists to enforce: Ghost Host starts its
+// player and its motor thread separately, each taking its own time reference,
+// and carries an uncorrected offset forever. We never start a clock of our own.
+// ---------------------------------------------------------------------------
+
+static const uint16_t TRACK_MAX_FRAMES = 8000;         // 160 s at 50 Hz
+static const uint8_t  FRAME_MS = 20;                   // 50 Hz, matches the box
+
+// Bytes of envelope per `trk d` chunk. 150 raw becomes 200 base64 characters,
+// and the line around it fits inside ESP-NOW's 250-byte payload with room to
+// spare. The SENDER must use the same number — it is how a sequence number is
+// turned back into a byte offset. firmware/README.md carries it too.
+static const uint32_t TRACK_CHUNK_BYTES = 150;
+
+static uint8_t  trackBuf[TRACK_MAX_FRAMES * 2];
+static uint16_t trackFrames = 0;                       // frames actually loaded
+static uint16_t trackClip = 0;
+static uint16_t rxFrames = 0;                          // expected, during load
+static uint32_t rxBytes = 0;                           // written so far
+
+static bool     playing = false;
+static uint32_t cueLocalMs = 0;    // millis() when the cue arrived
+static int32_t  cueTrackMs = 0;    // track position at that instant, incl lead
+
+// Small, table-free base64. The payload is text so the whole wire stays
+// readable — a chunk that arrives mangled is visible as mangled rather than
+// silently decoding to plausible garbage, which matters far more here than the
+// third of a packet the encoding costs.
+static int b64val(char c) {
+  if (c >= 'A' && c <= 'Z') return c - 'A';
+  if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+  if (c >= '0' && c <= '9') return c - '0' + 52;
+  if (c == '+') return 62;
+  if (c == '/') return 63;
+  return -1;                       // '=' padding and anything unexpected
+}
+
+static uint32_t b64decode(const char* in, uint8_t* out, uint32_t outMax) {
+  uint32_t n = 0;
+  int quad[4], q = 0;
+  for (const char* p = in; *p; p++) {
+    int v = b64val(*p);
+    if (v < 0) continue;
+    quad[q++] = v;
+    if (q < 4) continue;
+    q = 0;
+    uint32_t triple = (quad[0] << 18) | (quad[1] << 12) | (quad[2] << 6) | quad[3];
+    if (n < outMax) out[n++] = (triple >> 16) & 0xFF;
+    if (n < outMax) out[n++] = (triple >> 8) & 0xFF;
+    if (n < outMax) out[n++] = triple & 0xFF;
+  }
+  // Trailing '=' means the last group carried fewer than three bytes. The
+  // caller knows the true length from `trk begin`, so trimming here would be
+  // guesswork; it truncates against the declared frame count instead.
+  return n;
+}
+
+// Where in the track we are, right now, derived entirely from the box's cue.
+static int32_t trackPosMs() {
+  return (int32_t)(millis() - cueLocalMs) + cueTrackMs;
+}
+
+// ---------------------------------------------------------------------------
 // Speech. Two scalars, and the box sends nothing else.
 //
 //   env   [0,1]  how hard the speech is driving, right now
@@ -321,11 +403,41 @@ static float envHold = -1.0f;     // >=0 means a manual hold is in force
 static uint32_t speakUntil = 0;   // millis deadline for the synthetic test
 static uint32_t speakStart = 0;
 
+// The onset channel has a measurement FLOOR, and it is not zero. RMS over
+// 320-sample frames does not land on the period of the signal inside it, so the
+// level wobbles through even a held tone and the difference channel sees it —
+// measured at 7/255 = 0.027 on the box. A threshold of 0.02 therefore fires on
+// silence-shaped noise and the fire crackles continuously through steady
+// speech, which reads as the effect being noisy rather than as the threshold
+// being wrong. Sit clear of the floor.
+static const float ONSET_GATE = 0.06f;
+
 static void feedSpeech(float dt) {
   float raw = 0.0f;
 
+  // Priority: a manual hold, then a real track, then the synthetic stand-in.
+  // The track wins over `speak` so a cue arriving mid-demo does the right thing.
   if (envHold >= 0.0f) {
     raw = envHold;
+  } else if (playing) {
+    int32_t pos = trackPosMs();
+    if (pos < 0) {
+      raw = 0.0f;                       // cued early — lead_ms can be negative
+    } else {
+      uint32_t f = (uint32_t)pos / FRAME_MS;
+      if (f >= trackFrames) {
+        // The track ran out. Release rather than stop dead: `release` carries
+        // the fire back down over its own time constant, which is what a fire
+        // does. Completion is still an EVENT from the box (`stop`) for the
+        // aborted case — this is only the natural end.
+        playing = false;
+        Serial.println(F("track: finished"));
+      } else {
+        raw = trackBuf[f * 2] / 255.0f;
+        float on = trackBuf[f * 2 + 1] / 255.0f;
+        if (on > ONSET_GATE) spawnFlare(fminf(1.0f, on * 1.4f));
+      }
+    }
   } else if (speakUntil && millis() < speakUntil) {
     // A stand-in for real speech: syllables at ~4 Hz inside phrases, with a
     // gap every couple of seconds so the fire visibly settles between them.
@@ -355,13 +467,14 @@ static void feedSpeech(float dt) {
   k = 1.0f - powf(1.0f - k, dt * FPS);
   env += (raw - env) * k;
 
-  // Onset: half-wave rectified rise. A sharp climb spawns a crackle, which is
-  // what makes consonants visible.
-  float rise = env - prev;
-  if (rise > 0.02f) spawnFlare(fminf(1.0f, rise * 14.0f));
+  // Onset derived locally from the rise, for the synthetic and held cases. A
+  // real track carries its own onset channel and already spawned above — doing
+  // both would double every crackle.
+  if (!playing) {
+    float rise = env - prev;
+    if (rise > 0.02f) spawnFlare(fminf(1.0f, rise * 14.0f));
+  }
 }
-
-// ---------------------------------------------------------------------------
 
 static float heat[NUM_LEDS];
 
@@ -457,7 +570,9 @@ static void handleLine(String line) {
                + " breath=" + String(P.breathHz, 2)
                + " rel=" + String(P.release, 3)
                + " gain=" + String(P.speechGain, 2)
-               + " env=" + String(env, 2);
+               + " env=" + String(env, 2)
+               + " trk=" + String(trackFrames)
+               + (playing ? " playing@" + String(trackPosMs()) : " idle");
     Serial.println(out);
     linkSend(out);
     return;
@@ -474,6 +589,10 @@ static void handleLine(String line) {
     Serial.println(F("set brightness 70    less light reads as MORE saturated"));
     Serial.println(F("idle                 release the hold, stop speaking"));
     Serial.println(F("flare                fire one crackle now"));
+    Serial.println(F("trk begin|d|end      load an envelope track"));
+    Serial.println(F("cue <clip> <ms> <lead>   start it, on the box's clock"));
+    Serial.println(F("pos <ms>             correction; eased, never jumped"));
+    Serial.println(F("stop                 release to idle"));
     return;
   }
 
@@ -519,6 +638,138 @@ static void handleLine(String line) {
   if (verb == "idle") {
     envHold = -1.0f; speakUntil = 0;
     Serial.println(F("idle — envelope released"));
+    return;
+  }
+
+  // -- the track ----------------------------------------------------------
+  //
+  //    trk begin <clip> <frames>     start a load, clears whatever was here
+  //    trk d <seq> <base64>          one chunk of level/onset pairs
+  //    trk end                       -> "trk ok <clip> <frames>" or "trk err ..."
+  //
+  // `seq` is checked rather than trusted. A dropped chunk would otherwise shift
+  // every later frame earlier and produce a track that plays perfectly and is
+  // silently out of time — the worst outcome available, because it looks like
+  // bad sync rather than like a lost packet.
+  if (verb == "trk") {
+    int sp2 = rest.indexOf(' ');
+    String sub = (sp2 < 0) ? rest : rest.substring(0, sp2);
+    String args = (sp2 < 0) ? "" : rest.substring(sp2 + 1);
+
+    if (sub == "begin") {
+      int s3 = args.indexOf(' ');
+      trackClip = (uint16_t)args.substring(0, s3).toInt();
+      rxFrames = (uint16_t)args.substring(s3 + 1).toInt();
+      rxBytes = 0;
+      trackFrames = 0;
+      playing = false;
+      if (rxFrames == 0 || rxFrames > TRACK_MAX_FRAMES) {
+        String e = "trk err frames " + String(rxFrames) + " out of range";
+        Serial.println(e); linkSend(e);
+        rxFrames = 0;
+        return;
+      }
+      String m = "trk begin ok clip=" + String(trackClip) +
+                 " frames=" + String(rxFrames);
+      Serial.println(m); linkSend(m);
+      return;
+    }
+
+    if (sub == "d") {
+      if (!rxFrames) { String e = "trk err no begin"; Serial.println(e);
+                       linkSend(e); return; }
+      int s3 = args.indexOf(' ');
+      uint32_t seq = (uint32_t)args.substring(0, s3).toInt();
+      String payload = args.substring(s3 + 1);
+      uint32_t at = seq * TRACK_CHUNK_BYTES;
+      if (at != rxBytes) {
+        String e = "trk err seq " + String(seq) + " expected byte " +
+                   String(rxBytes) + " got " + String(at);
+        Serial.println(e); linkSend(e);
+        rxFrames = 0;
+        return;
+      }
+      uint32_t n = b64decode(payload.c_str(), trackBuf + rxBytes,
+                             sizeof(trackBuf) - rxBytes);
+      rxBytes += n;
+      linkQuiet();                     // 28 acks would flood the link, not just
+      return;                          // clutter it — see linkQuiet()
+    }
+
+    if (sub == "end") {
+      uint32_t want = (uint32_t)rxFrames * 2;
+      if (rxBytes < want) {
+        String e = "trk err short " + String(rxBytes) + " of " + String(want);
+        Serial.println(e); linkSend(e);
+        rxFrames = 0;
+        return;
+      }
+      trackFrames = rxFrames;
+      rxFrames = 0;
+      String m = "trk ok " + String(trackClip) + " " + String(trackFrames);
+      Serial.println(m); linkSend(m);
+      return;
+    }
+
+    String e = "trk err unknown " + sub;
+    Serial.println(e); linkSend(e);
+    return;
+  }
+
+  // -- the cue --------------------------------------------------------------
+  //
+  //    cue <clip> <position_ms> <lead_ms>
+  //
+  // Sent at ACTUAL playback start, carrying the position read from the playback
+  // handle. `lead_ms` is a measured per-channel trim, negative to run the light
+  // ahead of the sound: the Pi's audio-start jitter depends on its ALSA path,
+  // and light arriving slightly early reads as natural where late reads as
+  // broken. Tunable without a reflash, which is the whole point of it being a
+  // field in the message rather than a constant in here.
+  if (verb == "cue") {
+    if (!trackFrames) { String e = "cue err no track"; Serial.println(e);
+                        linkSend(e); return; }
+    int a1 = rest.indexOf(' ');
+    int a2 = rest.indexOf(' ', a1 + 1);
+    uint16_t clip = (uint16_t)rest.substring(0, a1).toInt();
+    int32_t posMs = rest.substring(a1 + 1, a2 < 0 ? rest.length() : a2).toInt();
+    int32_t lead = (a2 < 0) ? 0 : rest.substring(a2 + 1).toInt();
+    if (clip != trackClip) {
+      String e = "cue err clip " + String(clip) + " but loaded " + String(trackClip);
+      Serial.println(e); linkSend(e); return;
+    }
+    cueLocalMs = millis();
+    cueTrackMs = posMs + lead;
+    playing = true;
+    String m = "cue ok " + String(clip) + " at " + String(posMs) +
+               " lead " + String(lead);
+    Serial.println(m); linkSend(m);
+    return;
+  }
+
+  // -- the correction -------------------------------------------------------
+  //
+  //    pos <position_ms>
+  //
+  // EASE toward it, never jump. A visible correction is worse than the drift it
+  // fixes — the C3's crystal is good for well under a millisecond across a 40 s
+  // line, so a large error here means something real went wrong (the audio was
+  // paused, the cue was late) and snapping to it would show as the fire
+  // flinching. A quarter of the error per update converges in a few seconds and
+  // is invisible.
+  if (verb == "pos") {
+    if (!playing) return;
+    int32_t err = rest.toInt() - trackPosMs();
+    cueTrackMs += err / 4;
+    linkQuiet();                        // arrives every ~2s; must not ack
+    return;
+  }
+
+  // Completion is an EVENT, not a duration. An aborted greeting settles the fire
+  // correctly because it was told, rather than because a timer expired.
+  if (verb == "stop" || verb == "eof") {
+    playing = false;
+    Serial.println(F("track: released"));
     return;
   }
 

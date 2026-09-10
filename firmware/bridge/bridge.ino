@@ -124,7 +124,16 @@ void loop() {
   while (Serial.available()) {
     char c = (char)Serial.read();
     if (c != '\n' && c != '\r') {
-      if (buf.length() < 200) buf += c;
+      // 240, not 200. A track chunk is "trk d NN " plus 200 base64 characters —
+      // 210 total — and a 200-char cap silently truncated every one of them by
+      // 8 characters, i.e. 6 bytes of envelope. It did not error: the line
+      // forwarded fine, just short. The receiver's sequence check is what
+      // caught it, because a shortfall per chunk would otherwise have shifted
+      // the whole track progressively earlier and read as bad sync.
+      //
+      // ESP_NOW_MAX_DATA_LEN is 250, so this is the real ceiling; anything
+      // longer must be split by the sender, not quietly clipped here.
+      if (buf.length() < 240) buf += c;
       continue;
     }
     buf.trim();
