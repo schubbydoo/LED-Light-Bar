@@ -7,8 +7,9 @@ Two sketches, two ends of one radio link, versioned together — see the note in
 |---|---|
 | `metercheck/` | Steady DC on D10 so a multimeter can prove the level shifter. **Run this before the strip is ever connected.** |
 | `bringup/` | Five staged hardware questions, with the strip attached. |
-| `bar/` | The light bar — ambience renderer, ESP-NOW receiver. |
-| `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW. |
+| `pixelcheck/` | Whole-strip primaries and fixed markers, held. For when `bringup` raises a question about one pixel or one channel — it removes motion from the answer. |
+| `bar/` | The light bar — the ambience renderer. **Tunable live over serial.** |
+| `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW. Not started. |
 
 ---
 
@@ -56,7 +57,23 @@ belong on a machine whose day job is running a prop.
 ./monitor.sh bar                # follow serial until interrupted
 ./monitor.sh bar 30             # ...for 30 seconds
 ./monitor.sh bar 30 raw         # ...keeping the boot ROM and FastLED chatter
+
+./send.sh bar show              # every live parameter
+./send.sh bar "set breath 1.4"  # change one and watch it happen
+./send.sh bar "speak 4"         # synthetic speech envelope, no radio needed
+./send.sh bar "env 0.8"         # hold excitation, to judge the top end
 ```
+
+**A compile is 60-90 s, which is why `send.sh` exists.** The fire has thirteen
+parameters and every one is judged by eye; reflashing to try a number breaks the
+comparison you are holding in your head. Nothing sent is persisted — the board
+boots on its compiled defaults every time, deliberately, because a bar that lives
+in a borrowed prop must not retain state that surprises its owner in March. When
+a number is right, it goes back into `bar.ino` and gets committed.
+
+Note the two-minute foreground limit on tooling here: run `flash.sh` in the
+background or it can be killed mid-build. It was, once — during compile, so
+nothing was written, but a kill during the write would be worse.
 
 An app-only write is ~430 kB and a few seconds; `full` is 4 MB. Use `full` for a
 board that has never been flashed or whose partition table changed.

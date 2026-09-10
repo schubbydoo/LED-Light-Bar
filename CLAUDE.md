@@ -64,7 +64,7 @@ numbers and opens a mouth with them.
 - **Strip is rated −20 to +40 °C.** A sealed tiki mouth in Florida sun exceeds that with no
   power applied. Night prop only.
 
-## Firmware layout — decided 2026-09-10, nothing written yet
+## Firmware — written 2026-09-10, tuning not started
 
 **Both sketches live in this repo**, even though one of them runs on a board plugged into the
 SFX Box's USB:
@@ -76,6 +76,23 @@ They are two ends of **one** protocol and have to version together. A copy of th
 the SFX Box repo would drift the moment the message set changed, and that drift shows up as a
 prop that half-works rather than as a build error. The SFX Box repo references this one and
 vendors nothing; `sfx-box/README.md` says so from that side.
+
+Plus three diagnostics that exist because the hardware had never been exercised: `metercheck/`
+(strip disconnected, steady DC so a meter can prove the level shifter), `bringup/` (five staged
+questions with the strip attached), `pixelcheck/` (whole-strip primaries and fixed markers, held
+— for when `bringup` raises a question about one pixel or one channel).
+
+**Both XIAOs live on the SFX Box's USB, not on a PC.** That was not the plan and it is better
+than the plan: the box is a Linux machine with a shell on it, so `flash.sh`, `monitor.sh` and
+`send.sh` put nothing between an edit and a running board. The only step that needs a person is
+looking at the strip. Neither script addresses a board by `ttyACM` number — two identical boards
+enumerate in plug order, so they go by MAC through `/dev/serial/by-id/`. See `firmware/README.md`.
+
+**`send.sh` is how the fire gets tuned.** Thirteen parameters, all judged by eye, and a compile
+is 60-90s — reflashing to try a number destroys the comparison you are holding in your head.
+`speak <seconds>` runs a synthetic envelope, so attack, release and gain can be tuned **before
+ESP-NOW exists**; the radio then becomes a transport change against a renderer already known
+good, rather than two unknowns at once. Nothing sent is persisted, deliberately.
 
 ## Firmware notes
 
@@ -103,9 +120,23 @@ single-pixel test, not the fire renderer. If that first test shows nothing at al
 prior suspect is **pin 1 (1OE) not actually at GND** — the buffer's output sits high-impedance
 and everything looks correct.
 
-**Firmware: none.** No code exists yet. This is the next thing to build, and it starts from
-`docs/01-effect-design.md` — the fire model and the speech modulation — not from the wiring,
-which is settled.
+**Firmware: written, running, untuned.** `bar/` implements docs/01's four-layer model — ember
+floor, whole-strip breath, correlated spatial noise, Poisson flares — with colour a pure function
+of heat and gamma applied last.
+
+**The structural decision, which is not negotiable:**
+
+    heat[i] = clamp(EMBER_FLOOR, (noise[i] + flare[i]) * breath * (1 + speechGain*env), 1.0)
+
+At `env == 0` that collapses *exactly* to the idle fire, so there is **no talking mode**, no
+crossfade, and no state to get wrong. Idle is speech with a zero envelope. Anyone tempted to add
+a second renderer and blend between them should read docs/01 §4 first: that change turns a fire
+that speaks into a lamp on a dimmer, and no parameter recovers it.
+
+What has NOT happened: nobody has judged how it looks. Per docs/01 §10, that has to be in real
+darkness, at real viewing distance, on the real surface — a bench under room lights will mislead
+you completely. Tune `breathHz` first (the dominant cue) and `release` second (thermal inertia,
+the most character-defining number).
 
 ### Reading the diagrams
 
