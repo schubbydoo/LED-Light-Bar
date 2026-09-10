@@ -64,6 +64,19 @@ numbers and opens a mouth with them.
 - **Strip is rated −20 to +40 °C.** A sealed tiki mouth in Florida sun exceeds that with no
   power applied. Night prop only.
 
+## Firmware layout — decided 2026-09-10, nothing written yet
+
+**Both sketches live in this repo**, even though one of them runs on a board plugged into the
+SFX Box's USB:
+
+    firmware/bar/       the light bar — ambience renderer, ESP-NOW receiver
+    firmware/bridge/    the SFX Box's radio — serial ⇄ ESP-NOW, ~40 lines
+
+They are two ends of **one** protocol and have to version together. A copy of the bridge in
+the SFX Box repo would drift the moment the message set changed, and that drift shows up as a
+prop that half-works rather than as a build error. The SFX Box repo references this one and
+vendors nothing; `sfx-box/README.md` says so from that side.
+
 ## Firmware notes
 
 - **FastLED 3.6 or newer** — earlier versions predate ESP32-C3 support. `Adafruit_NeoPixel` and
@@ -122,3 +135,21 @@ sidecars). **It is deliberately not vendored here.**
 `sfx-box/` holds only what that project needs in order to understand this one: the spec
 addendum proposing where this capability belongs in its architecture. Everything else about
 the SFX Box lives in its own repo.
+
+### What the box can already do — 2026-09-10
+
+The box generates and serves **word timestamps** as a sidecar on any audio asset, at
+`GET /media/timestamps/<asset_id>`. Entry types are `word`, `spacing` and `audio_event`, in one
+shape whichever provider produced them, with a `version` field for a bar that cached a track.
+Details and the JSON in `sfx-box/README.md`.
+
+**That is not the fire's driver.** Word boundaries make a fire strobe rather than burn — the
+argument is in `docs/01-effect-design.md` and the addendum. The fire wants `speech_envelope`,
+which is **not built** on the box side. What timestamps give this project is the *other* half:
+phrase structure, so the bar can visibly settle between phrases and flare harder on an
+emphasised word. Plan on consuming both, not one.
+
+Still missing on the box side, in the order this project needs them: the `speech_envelope`
+sidecar, a `PIXEL` channel kind, the serial bridge, and cue emission bound to the playback
+handle's *actual* start. Nothing yet consumes a track at show time on either side, so **the
+one-clock rule has not been tested by anything** — it is still a rule, not a fact.
