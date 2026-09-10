@@ -17,7 +17,7 @@ do it in 40 × 25 mm if space is tighter, but there's no reward for cramming it.
 | 0.1 µF ceramic | 2 holes | At the socket's pins 14/7 |
 | 1000 µF 16 V | 2 holes, ~10 mm dia | At the output end |
 | 470 Ω | 3–4 holes | In the data line, output side |
-| 1N5817 Schottky | 3–4 holes | In the XIAO's 5 V feed |
+| 1N5819 Schottky | 3–4 holes | In the XIAO's 5 V feed. **As built** — confirmed on the board 2026-09-10 |
 | Tether pads | 2 | Plus a strain-relief hole |
 | JST SM 3-pin | 3 | Out to the strip |
 
@@ -38,7 +38,7 @@ Power enters one short edge, signal leaves the other. Nothing crosses.
    │   5V │ GND│         ▼                                    │
    │      │    │    ┌──────────┐                              │
    │   ◄─▷|    │    │ AHCT125  │  ‖ 0.1µF                      │
-   │   1N5817  │    │  socket  │                              │
+   │   1N5819  │    │  socket  │                              │
    │      │    │    └────┬─────┘                              │
    │ ═════╪════╪═════════╪═══════════════════════  +5 V BUS   │
    │ ═════╪════╪═════════╪═══════════════════════  GND  BUS   │
@@ -96,8 +96,8 @@ times than you expect, and you don't want to disassemble the tiki each time.
 |---|---|
 | Tether **red** | +5 V bus (star point) |
 | Tether **black** | GND bus (star point) |
-| +5 V bus | 1N5817 anode |
-| 1N5817 cathode | XIAO **5V** pin |
+| +5 V bus | 1N5819 anode |
+| 1N5819 cathode | XIAO **5V** pin |
 | +5 V bus | socket **pin 14** |
 | +5 V bus | 1000 µF **+**, and JST **+5 V wire (brown on this strip)** |
 | GND bus | XIAO **GND**, socket **pin 7**, 1000 µF **−**, JST **GND wire (white)** |

@@ -356,7 +356,7 @@ One USB-A output feeds everything. It splits at a **single star point** on the b
 
    +5 V ●──┬─────────────┬──────────────┬──────────────┐
            │             │              │              │
-        1000 µF      strip 5 V     74AHCT125       1N5817 ─▶|
+        1000 µF      strip 5 V     74AHCT125       1N5819 ─▶|
          16 V                        pin 14         (Schottky)
            │             │              │              │
    GND  ●──┴─────────────┴──────────────┴──────────────┴──▶ XIAO 5V pin
@@ -370,8 +370,13 @@ One USB-A output feeds everything. It splits at a **single star point** on the b
 
 Seeed requires a **series diode into the XIAO's 5V pin**, anode to your supply, cathode to the
 pin. It stops the TalentCell from back-feeding a laptop's USB port on the days you have USB-C
-plugged in for programming while the battery is also on. Use a **1N5817** (0.32 V drop) or
-**1N5819** (0.45 V) — 1 A parts, through-hole, pennies.
+plugged in for programming while the battery is also on. Either a **1N5817** (0.32 V drop) or
+a **1N5819** (0.45 V) does the job — 1 A parts, through-hole, pennies.
+
+**The board has a 1N5819** (confirmed 2026-09-10). Every figure in this repo already assumes
+it: the XIAO's 5 V pad reads **4.6–4.7 V**, not 5.0, and that reading is how you confirm the
+diode is the right way round rather than a fault. `docs/03` used to say 1N5817 in four places
+while the diagrams said 1N5819 — the diagrams were right, and the two now agree.
 
 After the diode the XIAO's 5V pin sees ~4.7 V, its onboard LDO makes 3.3 V from that with room to
 spare. The buffer and the strip stay on the full 5 V.
