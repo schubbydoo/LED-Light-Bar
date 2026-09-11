@@ -251,7 +251,13 @@ struct Params {
   // brief was "the underlying fire breathing" with red on top, not a fire that
   // doubles in brightness on every word.
   float speechGain  = 0.6f;    // how hard speech drives the fire
-  float speechSpread= 0.4f;    // how much loud speech widens the bright zone
+  // 0, not 0.4. This scales a SPATIAL noise coordinate, so modulating it
+  // rescales the pattern along the strip — a zoom — and a zoom driven by a
+  // speech envelope reads as the strip scrubbing rather than as zones widening.
+  // The time axis had the same fault and was fixable by integrating the rate;
+  // this axis is not, because there is no rate to integrate. See the note in
+  // the render loop. Kept as a parameter because a slow envelope can use it.
+  float speechSpread= 0.0f;    // how much loud speech widens the bright zone
   float attack      = 0.5f;    // syllable crispness
   float release     = 0.08f;   // thermal inertia — MOST CHARACTER-DEFINING
   // 1.0 = off, and off is correct for this palette. See buildGamma().
@@ -298,6 +304,22 @@ struct Params {
   // 0.6 keeps a low fire alive through the intro and still drops hard enough
   // between words to punctuate them.
   float blackout    = 0.6f;
+  // How long a gap must last before the blackout RELEASES and the ambience
+  // comes back. This is what lets one number mean two things.
+  //
+  // Steve's two requirements looked contradictory for an afternoon: darkness
+  // between words is what makes speech read (brightness contrast reads, hue
+  // contrast against a similar hue does not — measured by eye, repeatedly), but
+  // a greeting that opens with 13s of drums must not sit dark through it,
+  // because that reads as a broken prop rather than one waiting.
+  //
+  // They are only contradictory if `blackout` applies equally to a 0.4s pause
+  // and a 13s silence. A PAUSE should be punctuated; a SILENCE should be
+  // filled. So the blackout holds for `blackoutHold` and then eases off over
+  // `blackoutEase`. Phrase gaps run 0.30-0.76s on the real greetings and stay
+  // fully dark; the drum intro is fully lit within a couple of seconds.
+  float blackoutHold= 0.9f;    // seconds of silence before the fire returns
+  float blackoutEase= 1.2f;    // seconds to bring it back over
   float flashDecay  = 0.10f;   // seconds for red to leave after a word ends
   // Spawn a crackle at each word start as well. OFF: with red already marking
   // every word, the flares on top read as "too much flashing" — two events for
@@ -471,6 +493,22 @@ static int32_t trackPosMs() {
 // should leave cleanly so the gaps between words are genuinely dark.
 static float flashLevel = 0.0f;   // 0..1, follows the word span
 static float trackLevel = 0.0f;   // raw level from the track, this frame
+// 1 while a gap is short enough to punctuate, easing to 0 across a long silence.
+static float gapScale = 1.0f;
+// True while speech is happening from ANY source — a cued track or the synthetic
+// stand-in. Everything speech-dependent keys off this rather than off `playing`.
+//
+// It exists because `speak` kept turning out to be an unfaithful stand-in, twice
+// in one afternoon. First it drove the heat but never `trackLevel`, so no red
+// was ever mixed and four parameters — flash, flashHue, flashDecay, blackout —
+// could not be judged with it at all. Then the blackout turned out to be gated
+// on `playing`, so the stand-in could not exercise that either. Each gap cost a
+// 45s greeting and a walk past a fog machine to discover. A test rig that is
+// quietly missing the thing under test is worse than no test rig.
+static bool speechActive = false;
+// Mid-strip heat, kept only so `st` can report it. Cheap, and it separates "the
+// palette lookup is wrong" from "heat never moved".
+static float lastHeatMid = 0.0f;
 static float env = 0.0f;          // smoothed
 static float envTarget = 0.0f;    // raw, before asymmetric smoothing
 static float envHold = -1.0f;     // >=0 means a manual hold is in force
@@ -552,11 +590,32 @@ static void feedSpeech(float dt) {
       float syl = 0.5f + 0.5f * sinf(t * 2.0f * PI * 4.0f);
       raw = powf(syl, 1.6f) * (0.55f + 0.45f * sinf(t * 1.7f));
       if (raw < 0.0f) raw = 0.0f;
+      // Drive the WORD COLOUR too, not just the heat.
+      //
+      // This was missing, and it quietly made the stand-in useless for the one
+      // thing it exists for. `trackLevel` is what `flashLevel` follows, and it
+      // was set in the held-env branch and the real-track branch but not here —
+      // so `speak` lifted the fire's heat and never mixed in a single frame of
+      // red. The effect under `speak` was "slightly brighter fire", which is
+      // exactly what Steve reported when a 25s stand-in showed hardly any
+      // difference from idle.
+      //
+      // It matters beyond the confusion: `speak` is the loop this renderer is
+      // meant to be tuned in, and `flash`, `flashHue`, `flashDecay` and
+      // `blackout` are all downstream of `trackLevel`. Four of the parameters
+      // could never be judged with it, so they were only ever judged against a
+      // real greeting — at 45 seconds and a walk-past per attempt.
+      trackLevel = raw;
     }
   } else if (speakUntil && millis() >= speakUntil) {
     speakUntil = 0;
     Serial.println(F("speak: done"));
   }
+
+  // Set before the smoothing below, so everything downstream this frame agrees
+  // about whether speech is happening.
+  speechActive = playing || (envHold >= 0.0f) ||
+                 (speakUntil && millis() < speakUntil);
 
   envTarget = raw;
 
@@ -684,6 +743,8 @@ static bool setParam(const String& k, float v) {
   else if (k == "wordFlare")    P.wordFlare    = v;
   else if (k == "flashHue")     P.flashHue     = v;
   else if (k == "blackout")     P.blackout     = v;
+  else if (k == "blackoutHold") P.blackoutHold = v;
+  else if (k == "blackoutEase") P.blackoutEase = v;
   else if (k == "flareGap")     P.flareGap     = v;
   else if (k == "gamma")      { P.gamma = v; buildGamma(); }
   else if (k == "brightness") { P.brightness = (uint8_t)v;
@@ -716,6 +777,26 @@ static void handleLine(String line) {
                + " rel=" + String(P.release, 3)
                + " gain=" + String(P.speechGain, 2)
                + " env=" + String(env, 2)
+               // The word-colour path, reported because it cannot be inferred.
+               // An afternoon went into "is it the red or the fire?" with no way
+               // to ask: `st` carried env (the HEAT path) and nothing about the
+               // colour path at all, so every question about the red was
+               // answered by reading the source and guessing. These two are the
+               // whole chain — trackLevel is what the box asked for, flashLevel
+               // is what the renderer is acting on, and `mix` is what actually
+               // reaches a pixel.
+               + " trkLvl=" + String(trackLevel, 2)
+               + " flash=" + String(flashLevel, 2)
+               + " mix=" + String(fminf(1.0f, flashLevel * P.flash), 2)
+               // The LAST link in the chain: what actually reached a pixel.
+               // Everything above is what the renderer COMPUTED, and an
+               // afternoon was spent arguing about the difference. If mix moves
+               // and this does not, the fault is between the maths and the
+               // strip — not in the track, the envelope or the parameters.
+               + " px=" + String(leds[NUM_LEDS / 2].r) + ","
+                        + String(leds[NUM_LEDS / 2].g) + ","
+                        + String(leds[NUM_LEDS / 2].b)
+               + " heat=" + String(lastHeatMid, 2)
                + " trk=" + String(trackFrames)
                + (playing ? " playing@" + String(trackPosMs()) : " idle");
     Serial.println(out);
@@ -978,18 +1059,67 @@ void loop() {
   }
   if (flashLevel < 0.004f) flashLevel = 0.0f;
 
-  float tSec = millis() / 1000.0f;
+  // How long the track has been saying nothing, and hence whether this is a
+  // PAUSE (punctuate it) or a SILENCE (fill it). Measured from trackLevel
+  // rather than flashLevel so the renderer's own release does not extend it.
+  static float gapSec = 0.0f;
+  if (trackLevel > 0.01f) gapSec = 0.0f;
+  else                    gapSec += dt;
+  gapScale = 1.0f;
+  if (speechActive && gapSec > P.blackoutHold) {
+    float over = (gapSec - P.blackoutHold) / fmaxf(0.05f, P.blackoutEase);
+    gapScale = over >= 1.0f ? 0.0f : (1.0f - over);
+  }
+
+  // ------------------------------------------------------------------------
+  // NOISE PHASE IS ACCUMULATED, NEVER `time * rate`. This is load-bearing.
+  //
+  // It used to read:
+  //
+  //     uint16_t tz = (uint16_t)(tSec * P.timeScale * (1.0f + 0.6f * env));
+  //
+  // which multiplies ABSOLUTE time by a rate that speech is modulating. The
+  // moment `env` moves, the product jumps: thirty seconds in, env going
+  // 0.4 -> 0.9 shifts tz by over a THOUSAND noise units instantly, so the
+  // pattern does not speed up — it teleports. With a real speech envelope
+  // moving several times a second, the whole strip scrubs back and forth and
+  // reads as rapid blinking.
+  //
+  // Found on the prop, 2026-09-11, and it had survived every previous
+  // judgement of this renderer because of how those judgements were made: a
+  // HELD `env` renders perfectly (constant rate, no jumps), and the synthetic
+  // `speak` was only ever watched for a few seconds. The bug needs a
+  // fast-moving envelope to show itself, which only a real track provides.
+  // Steve spent an afternoon reporting it before I stopped adjusting the track
+  // and bisected the renderer: held env = calm, any playing track = blinking,
+  // frozen noise field = calm again.
+  //
+  // Integrating the rate instead is the whole fix. Speech now makes the fire
+  // drift genuinely faster, continuously, with no discontinuity anywhere.
+  static float noisePhase = 0.0f;
+  static float breathPhase = 0.0f;
+  float timeScale = P.timeScale * (1.0f + 0.6f * env);
+  noisePhase  += dt * timeScale;
+  // The breath integrates too. `breathHz` is not modulated by speech, so this
+  // was not the reported fault — but `set breathHz` while running is exactly
+  // the same discontinuity, and a tuning slider that jumps the pattern each
+  // time it moves makes the value impossible to judge.
+  breathPhase += dt * P.breathHz * 256.0f;
 
   // Layer 1 — breath. One value for the whole strip. Low-frequency noise rather
   // than a sine, because a periodic breath is audible to the eye as a loop.
-  uint16_t bz = (uint16_t)(tSec * P.breathHz * 256.0f);
+  uint16_t bz = (uint16_t)breathPhase;
   float breathRaw = noiseNorm(inoise8(0, bz));
   float breath = (1.0f - P.breathDepth) + P.breathDepth * breathRaw;
 
-  // Speech agitates the fire as well as brightening it: zones widen and drift
-  // faster while it is talking. Both collapse to the idle values at env = 0.
+  // Speech widens the zones as well as brightening them — but note that this
+  // one CANNOT be fixed by integration, because it scales a SPATIAL coordinate
+  // rather than a rate: changing it rescales the pattern under the viewer, which
+  // is a zoom, and a zoom driven by a speech envelope is the same visual fault
+  // as the jump above. Hence `speechSpread` now defaults to 0. It is kept
+  // because a slow envelope can use it safely, and removing a parameter people
+  // have tuned against is worse than documenting its edge.
   float spaceScale = P.spaceScale * (1.0f - P.speechSpread * 0.5f * env);
-  float timeScale  = P.timeScale  * (1.0f + 0.6f * env);
 
   // Layers 3 — advance the crackles.
   float flareField[NUM_LEDS] = {0};
@@ -1018,12 +1148,13 @@ void loop() {
     spawnFlare(0.35f + 0.45f * (random16() / 65535.0f));
 
   // Layer 2 — correlated spatial noise, then the whole expression.
-  uint16_t tz = (uint16_t)(tSec * timeScale);
+  uint16_t tz = (uint16_t)noisePhase;
   for (uint8_t i = 0; i < NUM_LEDS; i++) {
     float n = noiseNorm(inoise8((uint16_t)(i * spaceScale), tz));
     float h = (n + flareField[i]) * breath * (1.0f + P.speechGain * env);
     heat[i] = h < P.emberFloor ? P.emberFloor : (h > 1.0f ? 1.0f : h);
   }
+  lastHeatMid = heat[NUM_LEDS / 2];
 
   // Colour is a function of heat and nothing else, then gamma last.
   for (uint8_t i = 0; i < NUM_LEDS; i++) {
@@ -1040,8 +1171,12 @@ void loop() {
     // Everything off between words, while and only while a track is playing.
     // Applied last, as a master scale, so it dims the fire and the speech colour
     // together rather than becoming a second way to decide what a pixel is.
-    if (playing && P.blackout > 0.0f) {
-      float keep = 1.0f - P.blackout * (1.0f - flashLevel);
+    //
+    // `gapScale` is what distinguishes a pause from a silence — see the note on
+    // `blackoutHold`. A short gap stays dark and punctuates the speech; a long
+    // one gives the ambience back, so a musical introduction burns normally.
+    if (speechActive && P.blackout > 0.0f) {
+      float keep = 1.0f - P.blackout * gapScale * (1.0f - flashLevel);
       if (keep < 0.0f) keep = 0.0f;
       c.nscale8_video((uint8_t)(keep * 255.0f));
     }

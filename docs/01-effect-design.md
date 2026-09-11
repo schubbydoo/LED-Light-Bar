@@ -308,3 +308,43 @@ Every one of these is a way a fire effect announces itself as an LED strip:
   of the tiki. Sound and light arrive from roughly the same direction, so visual capture binds the
   voice to the mouth. Keep speakers out of the audience's approach path — walking right past one
   overrides the effect.
+
+## Addendum, 2026-09-11 — measured on the prop, and two things this document got wrong
+
+Written after an afternoon of a real greeting driving the bar, rather than a
+synthetic envelope. Both corrections come from watching, not from theory.
+
+### Speech should PUNCTUATE the ambience, not excite it
+
+§4's model is that speech *excites* the fire — `speechGain` lifts the heat, zones
+widen, the flame surges on a word. Measured against the alternative on the real
+prop, that contribution is nearly invisible next to the one thing that does read:
+**brightness contrast between lit and unlit**.
+
+The decisive observation: with the ambience visible in the gaps, a word colour
+mixed at 0.6 over an already-orange fire is a small *hue* step and barely
+registers. With the gaps darkened, the same word reads instantly. **Brightness
+contrast reads as speech; hue contrast against a similar hue does not.** So
+`blackout` — a parameter added late and almost as an afterthought — turns out to
+be the primary speech signal, and `speechGain` close to a refinement.
+
+### A word is the wrong grain; a phrase is the right one
+
+§4 asks for word timestamps to carry "phrase structure", and the first
+implementation took that to mean one event per word. On real speech that leaves a
+**median gap of 0.10 s** between words — the light clears and returns ten times a
+second's worth of structure, which is flicker, not speech.
+
+Merging gaps under 0.25 s gives **15 phrases instead of 55 words**, a 0.64 s
+median gap and a 1.28 s median span. Those numbers are a property of speech
+rather than a tuning choice: on the measured file every real phrase boundary is
+>=0.30 s and every gap inside a phrase is <0.20 s, so 0.20 and 0.30 give an
+identical answer. The plateau is the evidence.
+
+### What the box sends now
+
+A **gated envelope**: loudness inside a phrase, zero outside. The introduction
+goes dark because no word lives in it; the voice keeps its syllable detail. Word
+boundaries alone were binary and read as switching; raw loudness could not tell
+drums from a voice. The timings were only ever needed to *gate* the loudness.
+

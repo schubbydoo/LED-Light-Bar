@@ -151,7 +151,14 @@ The renderer needed no change for that. It steps whatever track it is given, so 
 decides what drives the fire by shaping the track — `envelope.word_track()` on that side.
 Keep it that way: the bar must stay ignorant of speech.
 
-**What a word does, as approved:**
+**What drives it, as of 2026-09-11:** a **gated envelope** from the box —
+loudness, but forced to zero outside a phrase, so the musical introduction is
+dark while the voice keeps its syllable structure. Word boundaries alone were
+binary and read as *"it just turns on and off to the words"*; raw loudness could
+not tell 14s of drums from a voice. Word timings were only ever needed to **gate**
+the loudness, not to replace it.
+
+**What a word does, as approved 2026-09-10 (before the noise-phase fix):**
 
 - red (`flashHue 0`) mixed at `flash 0.6` — the flame shows through, so it reads as *the fire
   going red* rather than *a red light turning on*
@@ -171,6 +178,47 @@ blackout does not apply, so the bar never sits dark on its own.
 fire was rendering in a third of its range (see the `inoise8` note below), and only ever
 against a **white wall** — which docs/01 §2 names as the surface that will mislead you. Redo
 it on matte, warm-toned card before touching the ramp again.
+
+## The bug that made the effect unwatchable — 2026-09-11
+
+**A noise coordinate must be an ACCUMULATED PHASE, never `time * rate`.** The
+renderer read:
+
+    uint16_t tz = (uint16_t)(tSec * P.timeScale * (1.0f + 0.6f * env));
+
+That multiplies *absolute* time by a rate speech is modulating. The instant `env`
+moves, the product jumps — thirty seconds in, env going 0.4 to 0.9 shifts `tz` by
+over a **thousand** noise units. The pattern does not speed up, it **teleports**.
+Against a real speech envelope moving several times a second, the whole strip
+scrubs back and forth, and what you see is rapid blinking. Fixed by integrating
+the rate: `noisePhase += dt * timeScale`.
+
+**Why it survived every earlier judgement of this renderer**, which is the part
+worth remembering:
+
+- a **held** `env` renders perfectly — constant rate, so no jumps at all
+- `speak` was only ever watched for a few seconds
+- the bug needs a **fast-moving** envelope to show itself, and only a real track
+  provides one
+
+So every tool used to tune the fire was blind to it by construction. It took an
+afternoon of a real greeting on the prop, and the diagnosis only came from
+bisecting the *renderer* rather than the track: held env = calm, any playing
+track = blinking, frozen noise field (`timeScale 0`) = calm again. **Three
+commands, no walk-past.** Reach for that bisection first next time.
+
+**`speechSpread` now defaults to 0** for a related but unfixable reason: it
+scales a *spatial* coordinate, so modulating it rescales the pattern along the
+strip — a zoom — and a zoom driven by speech is the same visual fault. There is
+no rate to integrate on a spatial axis. The parameter is kept because a slow
+envelope can use it safely.
+
+**The lesson for the box, too:** roughly two hours went into adjusting the
+*track* — word boundaries, phrase merging, gating, smoothing, a floor — for a
+fault that was entirely in the renderer. Several of those changes are real
+improvements and are keeping their place, but none of them could ever have fixed
+this. **When the shape of a complaint does not change as you change one side of
+a link, the fault is on the other side.**
 
 ## The trap that distorted everything before it
 
