@@ -71,6 +71,8 @@
 */
 
 #include <FastLED.h>
+#include <Preferences.h>
+#include <LittleFS.h>
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
@@ -340,6 +342,83 @@ struct Params {
   uint8_t brightness= 110;
 } P;
 
+// ---------------------------------------------------------------------------
+// PERSISTENCE. The reason this exists, in one sentence: the track lived in RAM,
+// so a battery blip mid-show left the bar silently dark until the box's next
+// cooldown push — and during a day of firmware work it disarmed the prop three
+// times in a row, each time looking exactly like the effect being broken.
+//
+// Two stores, because the two kinds of state want opposite things:
+//
+//   PARAMS -> NVS, and only on an explicit `save`. Auto-saving every `set`
+//             would write flash on every nudge of a tuning slider, and tuning
+//             is dozens of nudges. An explicit save also matches how the thing
+//             is actually judged: try a value, look at the strip, keep it.
+//
+//   TRACK  -> LittleFS, written automatically the moment a load succeeds. The
+//             box pushes one rarely and never during a show, so there is no
+//             wear question, and nobody should have to remember to save the
+//             thing that makes the prop work.
+// ---------------------------------------------------------------------------
+
+static void buildGamma();          // defined below; clearParams needs it
+
+static Preferences prefs;
+static const char*    NVS_NS        = "bar";
+static const uint16_t PARAMS_VERSION = 1;
+
+// The compiled values, captured before anything is loaded over them. `forget`
+// needs somewhere to go back to, and re-deriving them would mean maintaining a
+// second copy of every default.
+static Params DEFAULTS;
+
+static void saveParams() {
+  prefs.begin(NVS_NS, false);
+  prefs.putUShort("pver", PARAMS_VERSION);
+  prefs.putUShort("psize", (uint16_t)sizeof(Params));
+  prefs.putBytes("params", &P, sizeof(Params));
+  prefs.putUChar("amb", ambIndex);
+  prefs.end();
+}
+
+static void loadParams() {
+  prefs.begin(NVS_NS, true);
+  uint16_t ver  = prefs.getUShort("pver", 0);
+  uint16_t size = prefs.getUShort("psize", 0);
+  // Stored as one blob rather than a key per parameter: twenty-odd names would
+  // drift out of step with the struct the first time one was renamed, and a
+  // silently-missing key reads as a value of zero — which for `emberFloor` or
+  // `breathHz` is a dead-looking fire rather than an error.
+  //
+  // The version AND size must both match. If either differs, the firmware's
+  // parameter set has changed since the save, and the stored bytes mean
+  // something else now. Ignoring them is correct: compiled defaults are known
+  // good, and reinterpreting an old struct is how you get a fire whose values
+  // are individually plausible and collectively wrong.
+  if (ver == PARAMS_VERSION && size == sizeof(Params)) {
+    Params tmp;
+    if (prefs.getBytes("params", &tmp, sizeof(tmp)) == sizeof(tmp)) {
+      P = tmp;
+      uint8_t a = prefs.getUChar("amb", 0);
+      if (a < N_AMBIENCE) ambIndex = a;
+    }
+  } else if (ver) {
+    Serial.printf("params: stored v%u/%uB ignored (this build wants v%u/%uB)\n",
+                  ver, size, PARAMS_VERSION, (unsigned)sizeof(Params));
+  }
+  prefs.end();
+}
+
+static void clearParams() {
+  prefs.begin(NVS_NS, false);
+  prefs.clear();
+  prefs.end();
+  P = DEFAULTS;
+  ambIndex = 0;
+  FastLED.setBrightness(P.brightness);
+  buildGamma();
+}
+
 // Gamma, and why it defaults to OFF.
 //
 // docs/01 says to apply gamma as the last step before writing pixels, and for
@@ -418,6 +497,56 @@ static uint8_t  trackBuf[TRACK_MAX_FRAMES * 2];
 static uint16_t trackFrames = 0;                       // frames actually loaded
 static uint16_t trackClip = 0;
 static uint16_t rxFrames = 0;                          // expected, during load
+
+// The track on flash. A tiny header so a file from an older build, or a
+// half-written one, is rejected rather than rendered as noise.
+static const char*    TRACK_PATH  = "/track.bin";
+static const uint32_t TRACK_MAGIC = 0x4B525442;        // "BTRK"
+static const uint16_t TRACK_VER   = 1;
+
+struct TrackHeader {
+  uint32_t magic;
+  uint16_t version;
+  uint16_t clip;
+  uint16_t frames;
+};
+
+static bool fsReady = false;
+
+static bool saveTrack() {
+  if (!fsReady || !trackFrames) return false;
+  File f = LittleFS.open(TRACK_PATH, "w");
+  if (!f) return false;
+  TrackHeader h{TRACK_MAGIC, TRACK_VER, trackClip, trackFrames};
+  bool ok = f.write((uint8_t*)&h, sizeof(h)) == sizeof(h);
+  if (ok) {
+    size_t n = (size_t)trackFrames * 2;
+    ok = f.write(trackBuf, n) == n;
+  }
+  f.close();
+  if (!ok) LittleFS.remove(TRACK_PATH);   // never leave half a track behind
+  return ok;
+}
+
+static bool loadTrack() {
+  if (!fsReady || !LittleFS.exists(TRACK_PATH)) return false;
+  File f = LittleFS.open(TRACK_PATH, "r");
+  if (!f) return false;
+  TrackHeader h{};
+  bool ok = f.read((uint8_t*)&h, sizeof(h)) == sizeof(h)
+            && h.magic == TRACK_MAGIC && h.version == TRACK_VER
+            && h.frames > 0 && h.frames <= TRACK_MAX_FRAMES;
+  if (ok) {
+    size_t n = (size_t)h.frames * 2;
+    ok = f.read(trackBuf, n) == n;
+    if (ok) {
+      trackFrames = h.frames;
+      trackClip   = h.clip;
+    }
+  }
+  f.close();
+  return ok;
+}
 static uint32_t rxBytes = 0;                           // written so far
 
 static bool     playing = false;
@@ -673,6 +802,16 @@ void setup() {
   uint32_t t0 = millis();
   while (!Serial && millis() - t0 < 1500) { delay(10); }
 
+  // Capture the compiled values BEFORE anything is restored over them, so
+  // `forget` has somewhere to go back to.
+  DEFAULTS = P;
+
+  // Restore before FastLED is told the brightness, or a saved brightness would
+  // be set and then immediately overwritten by the compiled one.
+  loadParams();
+  fsReady = LittleFS.begin(true);          // format on first boot
+  bool restored = loadTrack();
+
   FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS)
          .setCorrection(TypicalLEDStrip);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS);
@@ -684,6 +823,14 @@ void setup() {
   Serial.println();
   Serial.println(F("=== light bar — ambience renderer ========================"));
   Serial.print  (F("ambience : ")); Serial.println(AMBIENCES[ambIndex].name);
+  Serial.print  (F("storage  : "));
+  if (!fsReady) {
+    Serial.println(F("LittleFS UNAVAILABLE — a power cycle will lose the track"));
+  } else if (restored) {
+    Serial.printf("track restored, clip %u, %u frames\n", trackClip, trackFrames);
+  } else {
+    Serial.println(F("ready, no stored track"));
+  }
   Serial.print  (F("pixels   : ")); Serial.println(NUM_LEDS);
   Serial.print  (F("my MAC   : ")); Serial.println(WiFi.macAddress());
   Serial.print  (F("link     : "));
@@ -798,9 +945,39 @@ static void handleLine(String line) {
                         + String(leds[NUM_LEDS / 2].b)
                + " heat=" + String(lastHeatMid, 2)
                + " trk=" + String(trackFrames)
+               // The CLIP, not just the count. The box verifies what the
+               // renderer holds rather than believing its own record — and once
+               // a track survives a reboot, "something is loaded" stops being
+               // the same question as "the right thing is loaded". A restored
+               // but stale track would otherwise satisfy that check and the
+               // cue would be refused with nothing having warned anyone.
+               + " clip=" + String(trackClip)
                + (playing ? " playing@" + String(trackPosMs()) : " idle");
     Serial.println(out);
     linkSend(out);
+    return;
+  }
+
+  // Explicit, not automatic. Tuning is dozens of nudges and each one would be a
+  // flash write; and being explicit matches how a look is actually arrived at —
+  // try a value, watch the strip, decide.
+  if (verb == "save") {
+    saveParams();
+    String m = "saved params" + String(trackFrames ? " (track already on flash)" : "");
+    Serial.println(m);
+    linkSend(m);
+    return;
+  }
+
+  if (verb == "forget") {
+    clearParams();
+    if (fsReady) LittleFS.remove(TRACK_PATH);
+    trackFrames = 0;
+    trackClip = 0;
+    playing = false;
+    String m = "forgot everything — compiled defaults, no track";
+    Serial.println(m);
+    linkSend(m);
     return;
   }
 
@@ -819,6 +996,8 @@ static void handleLine(String line) {
     Serial.println(F("cue <clip> <ms> <lead>   start it, on the box's clock"));
     Serial.println(F("pos <ms>             correction; eased, never jumped"));
     Serial.println(F("stop                 release to idle"));
+    Serial.println(F("save                 keep these params across a power cycle"));
+    Serial.println(F("forget               back to compiled defaults, drop the track"));
     return;
   }
 
@@ -932,7 +1111,12 @@ static void handleLine(String line) {
       }
       trackFrames = rxFrames;
       rxFrames = 0;
-      String m = "trk ok " + String(trackClip) + " " + String(trackFrames);
+      // Straight to flash. The box pushes a track rarely and never during a
+      // show, so there is no wear question and nothing to defer — and a track
+      // that survives a power cycle is the entire point of this being here.
+      bool saved = saveTrack();
+      String m = "trk ok " + String(trackClip) + " " + String(trackFrames)
+               + (saved ? " saved" : " (not saved)");
       Serial.println(m); linkSend(m);
       return;
     }
