@@ -234,6 +234,28 @@ static const Ambience AMBIENCES[] = {
 };
 static const uint8_t N_AMBIENCE = sizeof(AMBIENCES) / sizeof(AMBIENCES[0]);
 static uint8_t ambIndex = 0;
+
+// What feeds heat. AMBIENT is the four-layer fire and every other value is a
+// lamp behaviour. Speech still excites whichever is selected, so a blinking red
+// lamp that also speaks is a legitimate thing to ask for.
+enum {
+  MOTION_AMBIENT = 0,   // the ambience's own layers — noise, breath, flares
+  MOTION_SOLID   = 1,   // steady, full
+  MOTION_BLINK   = 2,   // square wave at blinkHz
+  MOTION_BREATHE = 3,   // the breath layer alone, no noise and no flares
+};
+static const char* MOTION_NAMES[] = {"ambient", "solid", "blink", "breathe"};
+static const uint8_t N_MOTION = 4;
+
+// Built at runtime from lampHue/lampSat, so the box can name any colour. Black
+// at the bottom of the ramp is what makes the existing heat layers work as
+// brightness: at heat 0 a lamp is off, at heat 1 it is the chosen colour.
+static CRGBPalette16 lampPal;
+static bool usingLamp = false;
+
+// Defined after Params and `palette`, which it needs. Declared here so the
+// command handlers above can call it.
+static void buildLampPalette();
 static CRGBPalette16 palette = pal_fire;
 
 // ---------------------------------------------------------------------------
@@ -340,7 +362,30 @@ struct Params {
   // cream. Less light reads as MORE saturated. Push it up on a dark, matte,
   // warm-toned surface where it has somewhere to go.
   uint8_t brightness= 110;
+
+  // ---- the LAMP ---------------------------------------------------------
+  // A prop does not always want speech. Sometimes it wants a red light that
+  // comes on, or a blue one that breathes. That is not a second renderer: a
+  // lamp is an ambience whose palette ramps from BLACK to a chosen colour, so
+  // "solid" and "breathing" fall straight out of the existing layers and only
+  // blinking is new. The four-layer expression is untouched — `motion` only
+  // decides what feeds heat.
+  //
+  // This is also the one place the box sends a COLOUR rather than a name, and
+  // that is deliberate rather than a breach of the division: for `fire`,
+  // `water` and `storm` the renderer owns what the name looks like, and the box
+  // must not know. For a lamp the colour IS the request.
+  uint8_t lampHue   = 0;       // FastLED hue; 0 red, 96 green, 160 blue
+  uint8_t lampSat   = 255;     // 0 is white
+  uint8_t motion    = 0;       // MOTION_AMBIENT; see the enum
+  float   blinkHz   = 1.0f;    // blinks per second, for MOTION_BLINK
+  float   blinkDuty = 0.5f;    // fraction of each cycle lit
 } P;
+
+static void buildLampPalette() {
+  lampPal = CRGBPalette16(CRGB::Black, CHSV(P.lampHue, P.lampSat, 255));
+  if (usingLamp) palette = lampPal;
+}
 
 // ---------------------------------------------------------------------------
 // PERSISTENCE. The reason this exists, in one sentence: the track lived in RAM,
@@ -365,7 +410,9 @@ static void buildGamma();          // defined below; clearParams needs it
 
 static Preferences prefs;
 static const char*    NVS_NS        = "bar";
-static const uint16_t PARAMS_VERSION = 1;
+// Bumped to 2 when the lamp fields joined Params. A stored v1 blob is ignored
+// rather than reinterpreted — see loadParams().
+static const uint16_t PARAMS_VERSION = 2;
 
 // The compiled values, captured before anything is loaded over them. `forget`
 // needs somewhere to go back to, and re-deriving them would mean maintaining a
@@ -809,6 +856,7 @@ void setup() {
   // Restore before FastLED is told the brightness, or a saved brightness would
   // be set and then immediately overwritten by the compiled one.
   loadParams();
+  buildLampPalette();          // from the restored hue/sat
   fsReady = LittleFS.begin(true);          // format on first boot
   bool restored = loadTrack();
 
@@ -892,6 +940,10 @@ static bool setParam(const String& k, float v) {
   else if (k == "blackout")     P.blackout     = v;
   else if (k == "blackoutHold") P.blackoutHold = v;
   else if (k == "blackoutEase") P.blackoutEase = v;
+  else if (k == "blinkHz")      P.blinkHz      = v;
+  else if (k == "blinkDuty")    P.blinkDuty    = v;
+  else if (k == "lampHue")    { P.lampHue = (uint8_t)v; buildLampPalette(); }
+  else if (k == "lampSat")    { P.lampSat = (uint8_t)v; buildLampPalette(); }
   else if (k == "flareGap")     P.flareGap     = v;
   else if (k == "gamma")      { P.gamma = v; buildGamma(); }
   else if (k == "brightness") { P.brightness = (uint8_t)v;
@@ -917,7 +969,10 @@ static void handleLine(String line) {
   // always the compiled defaults, not what you just set. Over the radio the bar
   // is never interrupted, so `st` is the only honest way to ask it anything.
   if (verb == "st") {
-    String out = "st amb=" + String(AMBIENCES[ambIndex].name)
+    String out = "st amb=" + String(usingLamp ? "lamp"
+                                             : AMBIENCES[ambIndex].name)
+               + " motion=" + String(MOTION_NAMES[P.motion])
+               + " hue=" + String(P.lampHue)
                + " y=" + String(P.yellow, 2)
                + " br=" + String(P.brightness)
                + " breath=" + String(P.breathHz, 2)
@@ -985,7 +1040,9 @@ static void handleLine(String line) {
     Serial.println(F("show                 every live parameter (serial only)"));
     Serial.println(F("st                   one-line state, answers over the radio"));
     Serial.println(F("set <key> <value>    change one (see show for keys)"));
-    Serial.println(F("amb <fire|water|storm>"));
+    Serial.println(F("amb <fire|water|storm|lamp>"));
+    Serial.println(F("lamp <hue> [sat]     a plain colour, and select it"));
+    Serial.println(F("motion <ambient|solid|blink|breathe>"));
     Serial.println(F("speak <seconds>      synthetic speech envelope"));
     Serial.println(F("env <0..1>           hold excitation; 'idle' releases"));
     Serial.println(F("set yellow 0.8       redder | 1.3 more yellow"));
@@ -1011,16 +1068,56 @@ static void handleLine(String line) {
     return;
   }
 
+  if (verb == "lamp") {
+    // `lamp <hue> [sat]` — and it selects the lamp, because asking for a colour
+    // and then having to select it separately is a step nobody would want.
+    int sp2 = rest.indexOf(' ');
+    String hs = (sp2 < 0) ? rest : rest.substring(0, sp2);
+    if (!hs.length()) {
+      String e = "lamp <hue 0-255> [sat 0-255]";
+      Serial.println(e); linkSend(e); return;
+    }
+    P.lampHue = (uint8_t)constrain(hs.toInt(), 0, 255);
+    if (sp2 >= 0) P.lampSat = (uint8_t)constrain(rest.substring(sp2 + 1).toInt(),
+                                                 0, 255);
+    usingLamp = true;
+    buildLampPalette();
+    String m = "lamp hue " + String(P.lampHue) + " sat " + String(P.lampSat);
+    Serial.println(m); linkSend(m);
+    return;
+  }
+
+  if (verb == "motion") {
+    for (uint8_t i = 0; i < N_MOTION; i++) {
+      if (rest == MOTION_NAMES[i]) {
+        P.motion = i;
+        String m = "motion " + rest;
+        Serial.println(m); linkSend(m);
+        return;
+      }
+    }
+    String e = "motion must be ambient, solid, blink or breathe";
+    Serial.println(e); linkSend(e);
+    return;
+  }
+
   if (verb == "amb") {
+    if (rest == "lamp") {
+      usingLamp = true;
+      buildLampPalette();
+      Serial.println(F("ambience = lamp"));
+      return;
+    }
     for (uint8_t i = 0; i < N_AMBIENCE; i++) {
       if (rest == AMBIENCES[i].name) {
         ambIndex = i;
+        usingLamp = false;
         palette = AMBIENCES[i].pal;
         Serial.println("ambience = " + rest);
         return;
       }
     }
-    Serial.println(F("ambience must be fire, water or storm"));
+    Serial.println(F("ambience must be fire, water, storm or lamp"));
     return;
   }
 
@@ -1332,11 +1429,44 @@ void loop() {
     spawnFlare(0.35f + 0.45f * (random16() / 65535.0f));
 
   // Layer 2 — correlated spatial noise, then the whole expression.
+  // The blink phase is ACCUMULATED, for the same reason the noise phase is:
+  // `time * blinkHz` jumps the moment the rate changes, so adjusting the rate
+  // while watching would make the lamp stutter rather than slow down. That bug
+  // cost an afternoon on the noise field; it is not going in a second time.
+  static float blinkPhase = 0.0f;
+  blinkPhase += dt * P.blinkHz;
+  if (blinkPhase >= 1.0f) blinkPhase -= (float)(int)blinkPhase;
+
   uint16_t tz = (uint16_t)noisePhase;
   for (uint8_t i = 0; i < NUM_LEDS; i++) {
-    float n = noiseNorm(inoise8((uint16_t)(i * spaceScale), tz));
-    float h = (n + flareField[i]) * breath * (1.0f + P.speechGain * env);
-    heat[i] = h < P.emberFloor ? P.emberFloor : (h > 1.0f ? 1.0f : h);
+    // `motion` decides what feeds heat; everything after this is unchanged, so
+    // a lamp goes through the same palette, the same speech excitation, the same
+    // word colour and the same blackout as a fire does. That is the point of
+    // doing it here rather than as a second renderer.
+    float base;
+    switch (P.motion) {
+      case MOTION_SOLID:
+        base = 1.0f;
+        break;
+      case MOTION_BLINK:
+        base = (blinkPhase < P.blinkDuty) ? 1.0f : 0.0f;
+        break;
+      case MOTION_BREATHE:
+        // The breath alone — one value for the whole strip, no spatial noise
+        // and no crackles. A lamp that breathes should swell as a single light,
+        // not shimmer along its length.
+        base = breath;
+        break;
+      default:
+        base = (noiseNorm(inoise8((uint16_t)(i * spaceScale), tz))
+                + flareField[i]) * breath;
+        break;
+    }
+    float h = base * (1.0f + P.speechGain * env);
+    // The ember floor is an AMBIENCE rule — "for a fire, dark reads as broken".
+    // A lamp must be able to be off, or blinking has nothing to blink to.
+    float floorHere = (P.motion == MOTION_AMBIENT) ? P.emberFloor : 0.0f;
+    heat[i] = h < floorHere ? floorHere : (h > 1.0f ? 1.0f : h);
   }
   lastHeatMid = heat[NUM_LEDS / 2];
 
