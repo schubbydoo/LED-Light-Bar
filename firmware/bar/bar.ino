@@ -1472,7 +1472,24 @@ void loop() {
 
   // Colour is a function of heat and nothing else, then gamma last.
   for (uint8_t i = 0; i < NUM_LEDS; i++) {
-    CRGB c = ColorFromPalette(palette, (uint8_t)(heat[i] * 255.0f), 255, LINEARBLEND);
+    // LINEARBLEND_NOWRAP, and the difference is not cosmetic.
+    //
+    // Plain LINEARBLEND treats a 16-entry palette as a RING: at index 255 it
+    // blends entry 15 back toward entry 0, so it returns 15/16 of entry 0 —
+    // which for every palette here is BLACK. Heat clamps to 1.0, so heat 1.0
+    // rendered as almost nothing.
+    //
+    // Found when `motion solid` pinned heat at exactly 1.0 and the strip went
+    // dark: "the light bar is not on anymore". But the fire had it too, and
+    // silently — peak heat happens on the loudest syllables, so the brightest
+    // moments of speech were dropping individual pixels to black. That is a
+    // stray dark flash exactly where the effect is meant to be strongest, and
+    // it is very likely part of what read as flicker for an afternoon.
+    //
+    // NOWRAP holds entry 15 at the top instead of wrapping. FastLED provides it
+    // for precisely this case.
+    CRGB c = ColorFromPalette(palette, (uint8_t)(heat[i] * 255.0f), 255,
+                              LINEARBLEND_NOWRAP);
     // Blend toward a bright saturated red for the word flash. Applied before
     // the yellow trim and the gamma table so it goes through the same output
     // path as everything else rather than becoming a second way to write a pixel.
