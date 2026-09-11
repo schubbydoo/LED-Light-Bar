@@ -92,7 +92,8 @@ enumerate in plug order, so they go by MAC through `/dev/serial/by-id/`. See `fi
 is 60-90s — reflashing to try a number destroys the comparison you are holding in your head.
 `speak <seconds>` runs a synthetic envelope, so attack, release and gain can be tuned **before
 ESP-NOW exists**; the radio then becomes a transport change against a renderer already known
-good, rather than two unknowns at once. Nothing sent is persisted, deliberately.
+good, rather than two unknowns at once. Values are kept only on an explicit `save` —
+see **Persistence** below.
 
 ## Firmware notes
 
@@ -178,6 +179,46 @@ blackout does not apply, so the bar never sits dark on its own.
 fire was rendering in a third of its range (see the `inoise8` note below), and only ever
 against a **white wall** — which docs/01 §2 names as the surface that will mislead you. Redo
 it on matte, warm-toned card before touching the ramp again.
+
+## Persistence — built and proven 2026-09-11
+
+**The track survives a power cycle**, and so do tuned parameters. Verified on the board
+with a real hard reset, not reasoned about: pushed clip 47295 / 2246 frames, reset over
+esptool, `st` reported it back.
+
+This stopped being a field-reliability nicety and became urgent the day the track's
+volatility broke a whole afternoon of testing — every firmware reflash emptied it, and
+three consecutive greetings played to a silently dark bar that looked exactly like a broken
+effect. In the field a battery blip does the same thing, mid-evening.
+
+Two stores, because the two kinds of state want opposite things:
+
+- **Params → NVS, on an explicit `save` only.** Tuning is dozens of nudges and each one
+  would otherwise be a flash write. Explicit also matches how a look is actually arrived
+  at: try a value, watch the strip, decide. `forget` returns to compiled defaults and drops
+  the track.
+- **Track → LittleFS, automatically** the moment a load succeeds. The box pushes one rarely
+  and never during a show, so there is no wear question, and nobody should have to remember
+  to save the thing that makes the prop work.
+
+Params are **one blob with a version AND a size**, not a key per parameter. Twenty-odd
+names would drift from the struct the first time one was renamed, and a silently-missing
+key reads as zero — which for `emberFloor` or `breathHz` is a dead-looking fire rather than
+an error. If either differs, the compiled defaults win.
+
+**`st` reports the loaded CLIP as well as the frame count**, and that is a consequence of
+persistence rather than a nicety. Until the track survived a reboot, *"is a track loaded"*
+and *"is the RIGHT track loaded"* were the same question. Now a bar can come up holding
+last night's line, pass a presence check, and then refuse the cue. The box checks the clip.
+
+**Program storage is at 89%** — LittleFS and Preferences cost ~50KB. Worth knowing before
+the next library goes in.
+
+**Not built: a lamp.** A chosen colour with solid / blinking / breathing motion, for a prop
+that wants a plain coloured light rather than speech. Designed, not started: a lamp is an
+ambience whose palette ramps from black to the chosen colour, so breathing and solid fall
+out of the existing layers and only blink is new. It must not modulate a *spatial* scale —
+see the note below on why `speechSpread` defaults to 0.
 
 ## The bug that made the effect unwatchable — 2026-09-11
 
