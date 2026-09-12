@@ -136,6 +136,14 @@ diffuser became flexible the bar gets contoured to each prop, so the length is a
 ./send.sh bridge save           # or the next battery change forgets it
 ```
 
+**A length below one pixel is refused, not clamped.** `String::toFloat()` answers 0.0 for
+anything it cannot parse, so `len abc`, `set leds 0` and a stray character all arrive as zero —
+and clamping zero up to 1 renders the fire into pixel 0 and blacks the other 143. That looks
+*exactly* like a dead strip, which is the worst disguise a typo can wear: it sends you to the
+wiring, the power and the level shifter before it occurs to you the firmware is doing as it was
+told. It cost an evening of a working prop looking broken on 2026-09-12. The top end still
+clamps — asking a 144-pixel build for 200 has an obvious right answer; zero does not.
+
 **`ends` is the verification, and there is no other one.** The far marker should land at the
 physical end of the diffuser: short of it, the number is low; no far marker at all and it is
 high, addressing pixels that are not there. The near marker is amber and the far one blue

@@ -1143,6 +1143,30 @@ static void estimatePower(uint32_t& wantMA, uint32_t& estMA, uint8_t& allowed) {
   estMA  = (unscaled * allowed)      / 255 / 5;
 }
 
+// A length nobody meant.
+//
+// Arduino's String::toFloat() answers 0.0 for anything it cannot parse, so
+// `len abc`, `len` with a stray character, and `set leds 0` all arrive here as
+// zero — and clamping zero up to 1 renders the fire into pixel 0 and blacks the
+// other 143. That looks EXACTLY like a dead strip, which is the worst possible
+// disguise for a typo: it sends you to the wiring, the power and the level
+// shifter before it occurs to you that the firmware is doing as it was told.
+// It cost an evening of a working prop looking broken, on 2026-09-12.
+//
+// So a non-positive length is refused rather than clamped. The upper end still
+// clamps, because asking a 144-pixel build for 200 has an obvious right answer
+// and no ambiguity about intent; zero has neither.
+static bool refuseBadLength(float px, const char* what) {
+  if (px >= 1.0f) return false;
+  String e = String("refused: ") + what + " works out as " + String(px, 1)
+           + " pixels. A length is 1.." + String(MAX_LEDS)
+           + ", and 0 is a typo rather than a request — the bar is unchanged at "
+           + String(P.numLeds) + ".";
+  Serial.println(e);
+  linkSend(e);
+  return true;
+}
+
 static void handleLine(String line) {
   line.trim();
   if (!line.length()) return;
@@ -1246,7 +1270,8 @@ static void handleLine(String line) {
       float inches = rest.toFloat();
       // 144 LED/m over 39.37 in/m = 3.6576 pixels per inch.
       float px = inches * 144.0f / 39.37f;
-      setParam("leds", px);            // clamps, and owns the rule
+      if (refuseBadLength(px, "that length")) return;
+      setParam("leds", px);            // clamps the top end
     }
     String out = "len " + String(P.numLeds / 144.0f * 39.37f, 1) + "in leds="
                + String(P.numLeds) + " max=" + String(MAX_LEDS);
@@ -1321,6 +1346,12 @@ static void handleLine(String line) {
     if (s2 < 0) { Serial.println(F("set <key> <value>")); return; }
     String k = rest.substring(0, s2);
     float v = rest.substring(s2 + 1).toFloat();
+    // Checked here rather than inside setParam so that "no such parameter"
+    // keeps meaning exactly one thing — the box watches for that string to
+    // detect its table drifting from this firmware, and a value complaint
+    // wearing the same words would read as drift that is not there.
+    if ((k == "leds" || k == "numLeds") && refuseBadLength(v, "that value"))
+      return;
     Serial.println(setParam(k, v) ? "ok " + k + " = " + String(v, 3)
                                   : "no such parameter: " + k);
     return;
