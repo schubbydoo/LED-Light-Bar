@@ -44,8 +44,9 @@ So split the build:
 > `brightness` with no aluminium behind the strip has not been checked, and `set maxMA` is the
 > lever if it turns out to matter.
 >
-> Two things to settle while doing it. **The tether now carries ~1.5 A**, so don't go thinner than
-> 20 AWG (`02-build-and-power.md`). And **a full metre includes the strip's factory solder joint
+> Two things to settle while doing it. **The tether carries ~0.8 A measured** (~1.9 A only if
+> someone runs the fire at full brightness), so don't go thinner than 20 AWG
+> (`02-build-and-power.md`). And **a full metre includes the strip's factory solder joint
 > at 50 cm**, around pixel 72, which the 14" cut deliberately avoided — it is the one mechanical
 > discontinuity in the run and the first suspect if the far half ever misbehaves.
 
@@ -85,13 +86,15 @@ exactly what you want for signal integrity.
 **Specs:** 12 V / 6000 mAh DC out (9–12.6 V, 3 A max) **and 5 V / 12000 mAh USB out at 2 A**.
 ~72 Wh nominal. Charges from its own 12.6 V 1 A charger in about 6 hours. Physical power button.
 
-**Runtime, at 144 pixels.** The 1.256 A measurement was the 50-pixel run and no longer describes
-this build. The whole strip running the fire at `brightness 110` estimates **~1.5 A (7.5 W)**, or
-~8 W with the XIAO. The 5 V rail is rated 12000 mAh (~60 Wh); call it **~52 Wh usable**, which
-gives **~6.5 h** — down from ~17 h at 50 pixels. Still more than the 20,000 mAh phone bank this
-replaces, still covers a 5–6 hour night, but **the margin is one night rather than two**: charge
-between nights rather than assuming it holds. Full numbers in `02-build-and-power.md`. It still
-kills a whole category of problem:
+**Runtime, at 144 pixels — measured.** The 1.256 A figure was the 50-pixel run on the SP002E. On
+this build, with all 144 lit and the fire at `brightness 110`, a USB meter reads **5.05 V /
+~0.80 A ≈ 4 W** for the whole thing, XIAO included. The 5 V rail is rated 12000 mAh (~60 Wh); call
+it **~52 Wh usable**, which gives **~13 h** — barely down from ~17 h at 50 pixels, because a fire
+is amber at partial heat rather than white. Comfortably more than the 20,000 mAh phone bank this
+replaces, and a 5–6 hour night is covered about twice over. *An earlier revision of this paragraph
+predicted ~6.5 h from W/LED arithmetic and told you the margin was one night; measuring it showed
+that was pessimistic by 2×.* Full numbers in `02-build-and-power.md`. It still kills a whole
+category of problem:
 
 **No auto-shutoff to design around.** These packs are built for continuous low-draw loads — CCTV
 cameras, LED strips — and switch on and off with a physical button rather than by sensing load. So
@@ -99,9 +102,10 @@ the trickle-mode hunt and the firmware idle-floor hack are both off the table. *
 bench with the USB power meter anyway* — run the box at a dim idle for half an hour and confirm it
 doesn't drop out. Cheap certainty.
 
-**⚠ The one constraint: 2 A on the USB output — and at 144 LEDs it is close.** The fire at
-`brightness 110` estimates ~1.5 A, about 75 % of the ceiling, so the cap is now *in the effect's
-path* rather than a distant guard rail. At full brightness the same fire wants ~3.5 A, and
+**⚠ The one constraint: 2 A on the USB output — with more room than expected.** The fire at
+`brightness 110` *measures* ~0.80 A, about 40 % of the ceiling, so the 1500 mA cap remains a
+distant guard rail rather than something in the effect's path — `pwr` has never once reported
+`LIMITING`. At full brightness the same fire would want ~1.9 A, and
 `fill_solid(CRGB::White)` on 144 WS2812Bs is **8.6 A** — four times what this supply can deliver.
 Guard it in firmware rather than by remembering:
 

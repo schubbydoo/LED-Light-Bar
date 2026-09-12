@@ -56,20 +56,27 @@ numbers and opens a mouth with them.
   kills the first pixel instantly.
 - **Two colour conventions coexist.** The tether is red/black; the strip's JST loom is
   brown/green/white. A red wire and a brown wire both land on +5 V. Don't "fix" one.
-- **The 2 A supply ceiling is real, and at 144 pixels it is CLOSE.** The 1.256 A measurement
-  (peak across every SP002E test pattern, 2026-09-09) was the 50-pixel strip and no longer
-  describes this build. The whole strip running the fire at `brightness 110` estimates **~1.5 A**,
-  or 75 % of the ceiling; at full brightness the same fire wants ~3.5 A and all-white wants
-  ~8.6 A, which this supply cannot deliver. Guard it in firmware:
+- **The 2 A supply ceiling is real, and there is more headroom than predicted.** MEASURED at the
+  supply 2026-09-12 with all 144 lit and the fire at `brightness 110`: **5.05 V / ~0.80 A ≈ 4 W**
+  for the whole build, XIAO included — about **40 %** of the ceiling, and ~13 h of runtime. An
+  earlier revision of this file predicted ~1.5 A and 75 %; that came from the manual's 0.12 W/LED,
+  which is **the figure for WHITE**, and this fire is amber and red at partial heat. All-white at
+  full brightness would still want ~8.6 A, which this supply cannot deliver. Guard it in firmware:
   `FastLED.setMaxPowerInVoltsAndMilliamps(5, 1500)` — 1500, not 1700, because the cap governs
   only the LEDs and the XIAO needs the rest. It is live as `set maxMA`.
-- **The power cap is now part of the EFFECT, not just the electrics.** At 50 pixels the frame
-  never approached 1500 mA, so FastLED's limiter was inert. At 144 the approved look sits within
-  a few percent of it, so the *bright* frames — a breath peak, a word flash — are the ones held
-  down: a dynamic dim that moves against the effect and reads as the fire fighting itself. Ask
-  `./send.sh bar pwr` (or read `mA=`/`!` in `st`); `LIMITING` means the cap set the level, not
-  `brightness`. The fix is a lower `brightness`, never a `maxMA` above what the supply delivers —
+- **The cap does NOT bite at the approved look — that prediction was wrong, and measurement is
+  why we know.** `pwr` sampled 14 times across the resting fire: **887–1185 mA, `allowed` equal to
+  `brightness` every time**, never `LIMITING`. And **speech makes it draw LESS, not more** — 427–987 mA
+  during `speak`, the lowest of the session, because `blackout` darkens all 144 pixels between
+  words while a word flash brightens only a few. Keep the warning for the day someone raises
+  `brightness`: ask `./send.sh bar pwr` (or read `mA=`/`capped=1` in `st`), and if it ever says
+  `LIMITING`, the fix is a lower `brightness`, never a `maxMA` above what the supply delivers —
   a brownout part-way along a WS2812B run reads as random colour, not as dimming.
+- **`pwr` reads ~20–35 % HIGH against a meter**, and that is the safe direction. FastLED's model
+  counts LEDs only at an assumed 5.0 V and does not know about `setCorrection(TypicalLEDStrip)`.
+  Measured 0.80 A total vs an estimate of 0.89–1.19 A for the LEDs alone. A real frame is always
+  further from the cap than `pwr` claims. A meter reading far *above* it would mean the model is
+  wrong, and then the meter wins.
 - **A full metre includes the strip's factory solder joint at 50 cm** (around pixel 72), which
   the 14" cut avoided. It carries everything past it and is the first suspect if the far half of
   the strip drops out, dims, or shifts colour while the near half is clean.

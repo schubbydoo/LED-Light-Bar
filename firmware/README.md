@@ -92,14 +92,15 @@ first, so the answer is always the defaults.
 
 ### Asking what it draws
 
-All 144 pixels are lit as of 2026-09-12, and that puts the approved look within a
-few percent of the 1500 mA cap. So "is the limiter dimming me?" became a question
-about the *look*, and it cannot be answered by reading the source — it depends on
-the frame on the strip right now:
+All 144 pixels are lit as of 2026-09-12. The arithmetic said that would put the
+approved look within a few percent of the 1500 mA cap; **measurement says it does
+not — 887-1185 mA across 14 samples, never once `LIMITING`.** Either way, "is the
+limiter dimming me?" is a question about the *look* that cannot be answered by
+reading the source, because it depends on the frame on the strip right now:
 
 ```
 ./send.sh bridge pwr
-   bar> pwr leds=144 br=110 allowed=110 wantMA=1487 capMA=1500 estMA=1487 headroom (+~45mA XIAO, not counted)
+   bar> pwr leds=144 br=110 allowed=110 wantMA=1181 capMA=1500 estMA=1181 headroom (+~45mA XIAO, not counted)
 ```
 
 `wantMA` is what this frame would draw at `brightness`; `estMA` is what the cap
@@ -108,11 +109,19 @@ you are looking at, not `brightness`** — a dim that moves against the effect, 
 the fix is a lower `brightness` rather than a higher `maxMA`. `st` carries `mA=`
 with a `!` for the limiting case, so the routine one-liner shows it too.
 
-`set maxMA <mA>` moves the cap live, which is what makes a USB meter usable: the
-estimate is FastLED's model of the LEDs only, at an assumed 5.0 V, so a meter on
-the supply should read somewhat *above* `estMA`. Far above means the model is
-wrong and the meter wins. Never set it above what the supply delivers — a
-brownout part-way along a WS2812B run reads as random colour, not as dimming.
+`set maxMA <mA>` moves the cap live, which is what makes a USB meter usable.
+**Measured 2026-09-12: the meter reads 5.05 V / ~0.80 A, BELOW `estMA`, not
+above** — the model counts LEDs only at an assumed 5.0 V and does not know about
+`setCorrection(TypicalLEDStrip)`, so it runs ~20-35 % high. That is the safe
+direction: a real frame is further from the cap than `pwr` claims. Far *above*
+would mean the model is wrong and the meter wins. Never set the cap above what
+the supply delivers — a brownout part-way along a WS2812B run reads as random
+colour, not as dimming.
+
+One result worth knowing before you go hunting for peaks: **speech makes the bar
+draw LESS.** Sampled during `speak`, the range was 427-987 mA — the lowest of the
+session — because `blackout` darkens all 144 pixels between words while a word
+flash brightens only a few.
 
 ### Telling it how long the bar is
 

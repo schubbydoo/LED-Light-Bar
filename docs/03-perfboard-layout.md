@@ -64,10 +64,11 @@ taps off those. This is what carries 1.2 A without the board's own resistance ea
 three loads — strip, buffer, XIAO — each tap the bus separately. Never daisy-chain
 XIAO → buffer → strip; strip current must not flow through a logic ground path.
 
-**3. Keep the strip's power and the strip's data on opposite halves.** 1.5 A switching at video
-rates next to a data line is how you get flicker that looks like a code bug — and at 144 pixels
-that is 1.5 A rather than the 1.2 A this rule was written for. Power on the bus
-rows, data across the middle, and cross them at right angles if you must cross at all.
+**3. Keep the strip's power and the strip's data on opposite halves.** Amps switching at video
+rates next to a data line is how you get flicker that looks like a code bug. At 144 pixels the
+measured current is ~0.8 A, close to the 1.2 A this rule was written for — the rule is about
+*switching* next to data, not about the average, so it holds regardless. Power on the bus rows,
+data across the middle, and cross them at right angles if you must cross at all.
 
 **4. The 1000 µF sits at the output connector**, not at the tether input. Its job is absorbing
 inrush when 144 pixels jump at once — it can only do that from the strip side, and the step it
@@ -141,15 +142,17 @@ strip; trim the spare power pigtail off and heat-shrink those two wires individu
 
 | JST pin | Wire on this strip | Carries | From |
 |---|---|---|---|
-| 1 | **brown** | **+5 V, ~1.5 A** | +5 V bus (star point) |
+| 1 | **brown** | **+5 V, ~0.8 A measured** | +5 V bus (star point) |
 | 2 | green | DIN, 5 V logic | socket pin 3 → 470 Ω |
-| 3 | white | **GND return, ~1.5 A** | GND bus |
+| 3 | white | **GND return, ~0.8 A measured** | GND bus |
 
 *(Pin order above is the working assumption — confirm it against the silkscreen with the meter.)*
 
 JST SM is rated **3 A per contact**. At 50 pixels the measured 1.256 A sat at 42 % of rating; at
-**144 pixels the estimate is ~1.5 A, or 50 %**, and the 1500 mA FastLED cap is what holds it
-there rather than headroom doing it. The connector is still comfortable — the cap is the reason. The vendor's own SP002E controller powers the strip the same way.
+**144 pixels the measured draw is ~0.80 A, or 27 %** — genuine headroom rather than the FastLED
+cap holding it there, which is what an earlier revision of this line assumed. The cap still
+matters as the guard against someone raising `brightness`, but it is not what keeps the connector
+comfortable today. The vendor's own SP002E controller powers the strip the same way.
 
 Because two of these contacts now carry the full strip current, **run them from the bus wires
 directly** — don't tap them off a shared leg with the XIAO or the buffer. And keep the 1000 µF

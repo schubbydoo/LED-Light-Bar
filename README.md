@@ -48,10 +48,12 @@ The strip was smoke-tested on its bundled SP002E controller: all 50 pixels light
 path through the single JST is proven at **1.256 A measured**. Wire colours were metered to the
 silkscreened pads, and the light-bar wiring was completed 2026-09-09.
 
-That measurement was the 50-pixel run. Since **2026-09-12** the build lights all 144, which
-estimates **~1.5 A** at the approved brightness — 75 % of the TalentCell's 2 A ceiling, and
-**~6.5 h** of runtime rather than ~17. `./send.sh bar pwr` reports the firmware's own estimate
-for the frame on the strip, to be read against a USB meter.
+That measurement was the 50-pixel run. Since **2026-09-12** the build lights all 144, and a USB
+meter on the supply reads **5.05 V / ~0.80 A ≈ 4 W** with the fire at its approved brightness —
+about **40 %** of the TalentCell's 2 A ceiling and **~13 h** of runtime. (An earlier estimate of
+~1.5 A came from the W/LED figure for *white*; this fire never goes white, and measuring it
+settled the question.) `./send.sh bar pwr` reports the firmware's own estimate for the frame on
+the strip, which runs ~20–35 % above what a meter reads.
 
 *This Status section otherwise predates the firmware, which is written and running on the prop —
 `CLAUDE.md` is the current account.*

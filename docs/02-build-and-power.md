@@ -405,47 +405,68 @@ path was proven to carry.
 
 | | Draw | |
 |---|---|---|
-| Strip, 144 LEDs — fire at `brightness 110`, the approved look | **~1.5 A** | **estimated**, from the manual's 0.12 W/LED and a 110/255 scale |
-| Strip, 144 LEDs — fire at full brightness | ~3.5 A | past the ceiling; the FastLED cap is what stops it |
-| Strip, 144 LEDs — all white, full brightness | ~8.6 A | not reachable on this supply at all, by a factor of four |
-| XIAO ESP32C3, radio listening | ~0.1 A | estimate |
-| 74AHCT125 | negligible | |
-| **Total at the approved look** | **~1.6 A** | |
-| TalentCell USB ceiling | **2.0 A** | **~20 % headroom** — was 32 % at 50 pixels |
+| **Whole build — fire at `brightness 110`, the approved look** | **5.05 V / ~0.80 A ≈ 4 W** | ⭐ **MEASURED at the supply, 2026-09-12**, XIAO included |
+| Strip alone, same frame, FastLED's own estimate | 0.89–1.19 A | `pwr`, 14 samples; reads ~20–35 % HIGH (see below) |
+| Strip alone, during speech | 0.43–0.99 A | **lower**, not higher — `blackout` darkens all 144 between words |
+| Strip, 144 LEDs — fire at full brightness | ~1.9 A | scaled from the measurement, not from white |
+| Strip, 144 LEDs — all white, full brightness | ~8.6 A | arithmetic; not reachable on this supply by a factor of four |
+| TalentCell USB ceiling | **2.0 A** | **~60 % headroom at the approved look** |
+
+> **The arithmetic in the first version of this table was wrong by nearly 2×**, and it is worth
+> saying why rather than quietly fixing the number. It predicted ~1.5 A from the manual's
+> 0.12 W/LED scaled by 110/255. **That is the figure for WHITE.** This fire is amber and red at
+> partial heat and never goes white, so the real draw is a little over half of it. Any future
+> "what will it draw" question should be answered with `pwr` and a meter, not with W/LED.
 
 **⚠ Every strip number in that table is arithmetic, not a measurement.** The firmware answers the
 same question about the frame that is actually on the strip:
 
     ./send.sh bar pwr
-    pwr leds=144 br=110 allowed=110 wantMA=1487 capMA=1500 estMA=1487 headroom (+~45mA XIAO, not counted)
+    pwr leds=144 br=110 allowed=110 wantMA=1181 capMA=1500 estMA=1181 headroom (+~45mA XIAO, not counted)
 
-`wantMA` is what the frame would draw at `brightness`; `estMA` is what the cap will allow it.
-`LIMITING` instead of `headroom` means the cap — not `brightness` — is setting the level of what
-you are looking at. `st` carries `mA=` too, with a `!` for the limiting case, because reading it
-over serial reboots the board and answers about the compiled defaults. **A meter on the supply
-should read somewhat above `estMA`** — it includes the XIAO, and FastLED's model counts LEDs only
-at an assumed 5.0 V. A meter reading far above it means the model is wrong, and the meter wins.
+(That is a real sample, not a worked example.) `wantMA` is what the frame would draw at
+`brightness`; `estMA` is what the cap will allow it. `LIMITING` instead of `headroom` means the
+cap — not `brightness` — is setting the level of what you are looking at. `st` carries `mA=` too,
+plus `capped=1` for the limiting case, because reading it over serial reboots the board and
+answers about the compiled defaults.
 
-**The cap is no longer a distant guard rail, and that is a change to the EFFECT.** At 50 pixels
-the frame never approached 1500 mA, so the limiter was inert and `brightness` alone set the level.
-At 144 the approved look sits within a few percent of the cap, so the bright frames — a breath
-peak, a word flash — are the ones that get held down. That is a dim that moves *against* the
-effect, and it will read as the fire fighting itself rather than as a power problem. If that shows
-up, **lower `brightness` until `pwr` reports headroom**; do not raise `maxMA` past what the supply
-can deliver, because a brownout part-way along a WS2812B run reads as random colour, not as
-dimming.
+**A meter on the supply reads BELOW `estMA`, not above it** — measured 0.80 A total against an
+estimate of 0.89–1.19 A for the LEDs alone. FastLED's model counts LEDs only, at an assumed
+5.0 V, and does not know about `setCorrection(TypicalLEDStrip)`, which scales what actually
+reaches the pixels. So **the estimate errs high, which is the safe direction for a cap**: a real
+frame is further from the limit than `pwr` claims, never closer. A meter reading far *above* it
+would mean the model's assumptions are wrong, and then the meter wins.
 
-**Runtime, roughly halved.** ~1.5 A × 5 V = 7.5 W for the strip, ~8 W with the XIAO. The
-TalentCell's 5 V rail is rated 12000 mAh (~60 Wh), call it ~52 Wh usable:
+**The cap is still a distant guard rail — the prediction that it would start biting was wrong.**
+It was a reasonable fear: at 50 pixels the limiter was inert and `brightness` alone set the level,
+and the arithmetic said 144 pixels would sit within a few percent of 1500 mA. Measured, it is not
+close. `pwr` sampled fourteen times across the resting fire reported **887–1185 mA with `allowed`
+equal to `brightness` every single time** — never once `LIMITING`.
+
+**Speech makes it draw LESS, which is the half nobody predicted.** The peaks were supposed to be
+the word flashes; sampling during `speak` gave the lowest numbers of the session, 427–987 mA.
+Obvious in hindsight: `blackout` is the primary speech signal, so between words all 144 pixels go
+dark, while a word flash brightens only a few. The bar spends a greeting darker than it spends
+its idle.
+
+The warning is still worth keeping for the day someone raises `brightness`, because it becomes
+true then: if the fire ever looks like it is fighting itself, **lower `brightness` until `pwr`
+reports headroom**; do not raise `maxMA` past what the supply can deliver, because a brownout
+part-way along a WS2812B run reads as random colour, not as dimming.
+
+**Runtime, barely dented.** The measured 4 W is the whole build. The TalentCell's 5 V rail is
+rated 12000 mAh (~60 Wh), call it ~52 Wh usable:
 
 | | Draw | Runtime |
 |---|---|---|
-| 144 px, fire at `brightness 110` | ~8 W | **~6.5 h** |
-| 144 px, fire at `brightness 70` | ~5.5 W | **~9 h** |
+| 144 px, fire at `brightness 110` | **~4 W measured** | **~13 h** |
+| 144 px, fire at `brightness 70` | ~2.7 W | ~19 h |
 | *(50 px, fire at `brightness 110` — what this was)* | ~3 W | *~17 h* |
 
-A 5–6 hour night is still covered, but **the margin is now one night rather than two.** Charge
-between nights instead of assuming it holds.
+A 5–6 hour night is covered about twice over. The earlier revision of this section predicted
+~6.5 h and told you to charge between nights; that came from the same white-LED arithmetic as the
+current budget above and was pessimistic by a factor of two. Charging between nights is still a
+good habit, but it is no longer load-bearing.
 
 **Set the FastLED cap to 1500 mA, not 1700** — the cap governs only the LEDs, so leaving 500 mA
 covers the XIAO plus converter tolerance:
@@ -464,9 +485,10 @@ is the TalentCell's **12 V output, rated 3 A**, through a 5 V/3 A buck module. T
 
 ### Wire gauge check
 
-6 ft of 20 AWG, out and back, is about 0.12 Ω. At 1.5 A — the 144-pixel figure — that's a
-**0.18 V drop**, so the strip sees ~4.8 V, which is fine. 22 AWG would drop ~0.29 V and still
-work, but at this current 20 AWG stops being merely the comfortable call: **don't go thinner than
+6 ft of 20 AWG, out and back, is about 0.12 Ω. At the measured 0.8 A that's a **0.1 V drop**, so
+the strip sees ~4.95 V. Size it for the worst case rather than the typical one: at ~1.9 A (the
+fire at full brightness) the drop is 0.23 V and the strip still sees ~4.8 V, which is fine. 22 AWG
+would drop ~0.37 V in that case and still work, but **don't go thinner than
 20 now.** Volt drop is also fed by the strip's own copper, and over a full metre the far end is
 dimmer and warmer-toned than the near end by more than it was over 14". If a colour gradient
 along the run shows up, that is the cause, and the fix is injecting +5 V and GND at the far end
@@ -505,7 +527,8 @@ and at 144 pixels you're adding ~7.5 W inside it rather than the ~3 W this was w
   written against — the aluminium has the length to shed it, but the sealed-mouth case did not
   get easier.
 - **Keep the tiki out of direct afternoon sun** if the bar lives in it permanently, or pull the
-  bar between nights — which the ~6.5 h runtime at 144 pixels is now another reason to do anyway.
+  bar between nights. The ~13 h measured runtime means the battery is no longer the reason to;
+  heat is.
 
 The aluminium channel is doing real work here, not just optics.
 
@@ -786,19 +809,19 @@ pigtail off. One connector to the bar.
 
 | | Current | % of rating |
 |---|---|---|
-| Fire effect, 144 px at `brightness 110` | ~1.5 A | 50 % |
+| Fire effect, 144 px at `brightness 110` | **~0.8 A measured** | 27 % |
 | FastLED cap (`maxMA`, live) | 1.5 A | 50 % |
-| Fire at full brightness, uncapped | ~3.5 A | **117 % ⚠** |
+| Fire at full brightness, uncapped | ~1.9 A | 63 % |
 | Full white, uncapped | ~8.6 A | **287 % ⚠⚠** |
 
-*(At 50 pixels those last two rows were 1.2 A and 3.0 A, and the connector had margin on every
-one of them. It does not any more.)*
+At the current this prop actually draws you're at just over a quarter of the connector's rating,
+and that is real headroom rather than the cap holding you there — `pwr` has never reported
+`LIMITING`. **The cap is still the guard against the one case that matters**, full white, which
+no ambience asks for but a bug might. The supply gives out before the connector does, which is
+the merciful ordering; don't rely on it.
 
-At the current this prop actually draws you're at half the connector's rating. **The firmware cap
-is what keeps you there, and at 144 pixels it is the only thing that does** — the uncapped cases
-now exceed 3 A per contact rather than just touching it, so the cap is doing triple duty:
-the TalentCell's 2 A ceiling, the connector's 3 A, and the strip's own copper. The supply gives
-out first in practice, which is the merciful ordering; don't rely on it.
+*(An earlier revision of this table put the fire at ~1.5 A and full brightness at ~3.5 A, from
+W/LED arithmetic for white pixels. Measurement more than halved both.)*
 
 ### So why does the strip ship with separate power leads?
 

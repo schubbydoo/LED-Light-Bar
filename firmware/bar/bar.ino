@@ -101,19 +101,32 @@
 // same, and it is not scaled automatically because it is judged by eye. What
 // does scale, and scales hard, is the electrical side:
 //
-//   * DRAW IS PER PIXEL, so it tracks the length directly. 50 px of fire at
-//     brightness 110 estimates ~0.5 A; 144 px estimates ~1.5 A, which is this
-//     build's cap and about 75 % of the TalentCell's 2 A USB ceiling. Shorten
-//     the bar and that falls proportionally. `pwr` prints the estimate for the
-//     CURRENT length so a meter has something to disagree with, and `st`
-//     carries it too — because reading it over serial reboots the board and
-//     answers about the defaults instead.
-//   * THE CAP NOW BITES. At 50 px the frame never approached 1500 mA, so
-//     FastLED's limiter was inert and `brightness` alone set the level. At
-//     144 px the bright frames — a breath peak, a word flash — are what get
-//     held down, which is a dim that moves AGAINST the effect. If the fire
-//     starts to look like it is fighting itself, lower `brightness` until
-//     `pwr` reports headroom rather than raising `maxMA` past the supply.
+//   * DRAW IS PER PIXEL, so it tracks the length directly. MEASURED on the
+//     prop 2026-09-12, 144 px, fire at brightness 110: a USB meter on the
+//     supply reads 5.05 V / ~0.80 A — about 4 W for the whole build, XIAO
+//     included, and ~40 % of the TalentCell's 2 A ceiling. Shorten the bar and
+//     that falls proportionally. `pwr` prints the estimate for the CURRENT
+//     length so a meter has something to disagree with, and `st` carries it
+//     too — because reading it over serial reboots the board and answers about
+//     the defaults instead.
+//   * THE CAP STILL DOES NOT BITE — and this corrects a prediction made here
+//     the same morning. The arithmetic said 144 px at brightness 110 would sit
+//     within a few percent of the 1500 mA cap, so the bright frames would get
+//     held down. MEASURED, it does not come close: `pwr` sampled fourteen times
+//     across the resting fire reported 887-1185 mA, and `allowed` equalled
+//     `brightness` on every one. The prediction came from 0.12 W/LED, which is
+//     the figure for WHITE; this fire is amber and red at partial heat and
+//     never goes white.
+//
+//     SPEECH LOWERS THE DRAW, which is the other half of why the peaks never
+//     arrived. `blackout` is the primary speech signal, so between words all
+//     144 pixels go dark while the word flash brightens only a few: sampled
+//     during `speak`, the range was 427-987 mA — the LOWEST of the session.
+//
+//     The warning is still worth keeping, because it becomes true as
+//     `brightness` rises: if the fire ever looks like it is fighting itself,
+//     check `pwr` for LIMITING and lower `brightness` rather than raising
+//     `maxMA` past what the supply can deliver.
 //
 // VERIFYING THE LENGTH: nothing in the firmware can tell whether `numLeds`
 // matches the strip. `ends` lights the first and last pixel of the current
@@ -1099,11 +1112,18 @@ static bool setParam(const String& k, float v) {
 // estMA < wantMA means the limiter is holding the frame down. FastLED's own
 // model is used rather than a constant per pixel, so the estimate tracks the
 // fire instead of assuming white — but it is a MODEL: it counts the LEDs only,
-// at an assumed 5.0 V, and excludes the ~40-50 mA the XIAO itself takes. A
-// meter on the supply should read somewhat ABOVE estMA. A meter reading far
-// below it is the colour correction, which the model does not account for — so
-// the estimate errs HIGH, which is the safe direction for a cap. A meter far
-// above it means the model's assumptions are wrong, and the meter wins.
+// at an assumed 5.0 V, and excludes the ~40-50 mA the XIAO itself takes.
+//
+// MEASURED AGAINST A METER, 2026-09-12: it reads BELOW this estimate, not above,
+// which is the opposite of what this comment first predicted. Supply 5.05 V /
+// ~0.80 A total, against an estMA of 0.89-1.19 A for the LEDs alone — so with
+// the XIAO's ~45 mA backed out, the model reads high by roughly a fifth to a
+// third. The cause is `setCorrection(TypicalLEDStrip)`: it scales what actually
+// reaches the pixels, and `calculate_unscaled_power_mW` does not know about it.
+//
+// So the estimate errs HIGH, which is the safe direction for a cap — a real
+// frame is further from the limit than this claims, never closer. A meter far
+// ABOVE it would mean the model's assumptions are wrong, and then the meter wins.
 // ---------------------------------------------------------------------------
 // Outputs by reference rather than a returned struct: the .ino preprocessor
 // generates prototypes ahead of every file-scope type, so a function returning
