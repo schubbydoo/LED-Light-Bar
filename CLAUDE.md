@@ -56,27 +56,31 @@ numbers and opens a mouth with them.
   kills the first pixel instantly.
 - **Two colour conventions coexist.** The tether is red/black; the strip's JST loom is
   brown/green/white. A red wire and a brown wire both land on +5 V. Don't "fix" one.
-- **The 2 A supply ceiling is real, and there is more headroom than predicted.** MEASURED at the
-  supply 2026-09-12 with all 144 lit and the fire at `brightness 110`: **5.05 V / ~0.80 A ≈ 4 W**
-  for the whole build, XIAO included — about **40 %** of the ceiling, and ~13 h of runtime. An
-  earlier revision of this file predicted ~1.5 A and 75 %; that came from the manual's 0.12 W/LED,
-  which is **the figure for WHITE**, and this fire is amber and red at partial heat. All-white at
-  full brightness would still want ~8.6 A, which this supply cannot deliver. Guard it in firmware:
+- **The 2 A supply ceiling is real, with comfortable headroom.** MEASURED at the supply
+  2026-09-12, all 144 lit, fire at `brightness 110`: **~1.0–1.2 A at rest (~5.5 W)** for the whole
+  build, XIAO included — around **55 %** of the ceiling and ~9 h of runtime. **During a greeting it
+  falls to ~0.7–0.8 A**, because `blackout` darkens all 144 pixels between words; a busy night is
+  cheaper than a quiet one. An earlier revision predicted ~1.5 A from the manual's 0.12 W/LED,
+  which is **the figure for WHITE** — this fire never goes white. All-white at full brightness
+  would still want ~8.6 A, which this supply cannot deliver. Guard it in firmware:
   `FastLED.setMaxPowerInVoltsAndMilliamps(5, 1500)` — 1500, not 1700, because the cap governs
   only the LEDs and the XIAO needs the rest. It is live as `set maxMA`.
-- **The cap does NOT bite at the approved look — that prediction was wrong, and measurement is
-  why we know.** `pwr` sampled 14 times across the resting fire: **887–1185 mA, `allowed` equal to
-  `brightness` every time**, never `LIMITING`. And **speech makes it draw LESS, not more** — 427–987 mA
-  during `speak`, the lowest of the session, because `blackout` darkens all 144 pixels between
-  words while a word flash brightens only a few. Keep the warning for the day someone raises
-  `brightness`: ask `./send.sh bar pwr` (or read `mA=`/`capped=1` in `st`), and if it ever says
-  `LIMITING`, the fix is a lower `brightness`, never a `maxMA` above what the supply delivers —
-  a brownout part-way along a WS2812B run reads as random colour, not as dimming.
-- **`pwr` reads ~20–35 % HIGH against a meter**, and that is the safe direction. FastLED's model
-  counts LEDs only at an assumed 5.0 V and does not know about `setCorrection(TypicalLEDStrip)`.
-  Measured 0.80 A total vs an estimate of 0.89–1.19 A for the LEDs alone. A real frame is always
-  further from the cap than `pwr` claims. A meter reading far *above* it would mean the model is
-  wrong, and then the meter wins.
+- **The cap bites for WHOLE-STRIP modes, not for the fire.** Measured: the resting ambient fire is
+  887–1185 mA with `allowed` equal to `brightness` on all 14 samples — never limited, so the look a
+  greeting performs is never held down. But `motion breathe` samples 1400–1489 mA with `capped=1`
+  about half the time, and a solid white lamp is pinned at the cap. Those modes drive every pixel
+  to full together; the fire only ever drives some. **`speech` makes it draw LESS, not more** —
+  427–987 mA during `speak`, because `blackout` darkens all 144 between words while a word flash
+  brightens only a few. If a look ever seems to fight itself, read `capped=1` in `st`; the fix is a
+  lower `brightness`, never a `maxMA` above what the supply delivers — a brownout part-way along a
+  WS2812B run reads as random colour, not as dimming.
+- **`pwr` agrees with a meter for the FIRE, and runs ~30 % high for WHITE.** Amber at partial heat:
+  1.0–1.2 A measured against 0.89–1.19 A estimated. Solid white: the cap holds the model at 1500 mA
+  while the meter reads **1.14 A**. `setCorrection(TypicalLEDStrip)` scales green to ~69 % and blue
+  to ~94 %, and `calculate_unscaled_power_mW` does not know it happened — a red-and-amber fire
+  barely touches the corrected channels, white uses all three. **The error is always in the safe
+  direction.** And read the meter over TIME: one spot reading of 0.80 A, taken mid-breath, briefly
+  had this file claiming the model ran high for everything.
 - **A full metre includes the strip's factory solder joint at 50 cm** (around pixel 72), which
   the 14" cut avoided. It carries everything past it and is the first suspect if the far half of
   the strip drops out, dims, or shifts colour while the near half is clean.

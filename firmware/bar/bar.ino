@@ -1136,16 +1136,25 @@ static bool setParam(const String& k, float v) {
 // fire instead of assuming white — but it is a MODEL: it counts the LEDs only,
 // at an assumed 5.0 V, and excludes the ~40-50 mA the XIAO itself takes.
 //
-// MEASURED AGAINST A METER, 2026-09-12: it reads BELOW this estimate, not above,
-// which is the opposite of what this comment first predicted. Supply 5.05 V /
-// ~0.80 A total, against an estMA of 0.89-1.19 A for the LEDs alone — so with
-// the XIAO's ~45 mA backed out, the model reads high by roughly a fifth to a
-// third. The cause is `setCorrection(TypicalLEDStrip)`: it scales what actually
-// reaches the pixels, and `calculate_unscaled_power_mW` does not know about it.
+// MEASURED AGAINST A METER, 2026-09-12. How well it agrees depends on COLOUR,
+// and that is worth knowing before trusting either number:
 //
-// So the estimate errs HIGH, which is the safe direction for a cap — a real
-// frame is further from the limit than this claims, never closer. A meter far
-// ABOVE it would mean the model's assumptions are wrong, and then the meter wins.
+//   fire, amber at partial heat   meter 1.0-1.2 A vs est 0.89-1.19 A — agrees
+//   lamp, solid white             meter 1.14 A while the cap held the model at
+//                                 1500 mA — the model ~30 % high
+//
+// `setCorrection(TypicalLEDStrip)` scales green to ~69 % and blue to ~94 % of
+// what is asked, and `calculate_unscaled_power_mW` does not know it happened. A
+// red-and-amber fire barely touches the corrected channels; white uses all
+// three, so white is where the gap shows.
+//
+// The error is therefore always in the SAFE direction — a real frame is at or
+// below what this claims, never above. A meter far ABOVE it would mean the
+// assumptions are wrong, and then the meter wins.
+//
+// And read a meter over TIME. The fire breathes at ~1.1 Hz, so one spot sample
+// lands anywhere in the swing: a single 0.80 A reading briefly had the docs
+// claiming the model ran high for everything.
 // ---------------------------------------------------------------------------
 // Outputs by reference rather than a returned struct: the .ino preprocessor
 // generates prototypes ahead of every file-scope type, so a function returning

@@ -405,18 +405,32 @@ path was proven to carry.
 
 | | Draw | |
 |---|---|---|
-| **Whole build — fire at `brightness 110`, the approved look** | **5.05 V / ~0.80 A ≈ 4 W** | ⭐ **MEASURED at the supply, 2026-09-12**, XIAO included |
-| Strip alone, same frame, FastLED's own estimate | 0.89–1.19 A | `pwr`, 14 samples; reads ~20–35 % HIGH (see below) |
-| Strip alone, during speech | 0.43–0.99 A | **lower**, not higher — `blackout` darkens all 144 between words |
+| State (144 px, `brightness 110`) | Meter | `pwr` estimate | Cap engaged? |
+|---|---|---|---|
+| **Fire, `ambient` — the approved look** | **~1.0–1.2 A** | 887–1185 mA | no, 14 of 14 samples |
+| **During a greeting** | **~0.7–0.8 A** | 427–987 mA | no — speech draws LESS |
+| `motion breathe`, whole strip | — | 1400–1489 mA | **yes, about half the samples** |
+| Lamp, solid **white** | **1.14 A** | held at the 1500 cap | **yes** |
+
+*(Meter figures are at the supply and include the XIAO's ~45 mA; `pwr` counts LEDs only.)*
 | Strip, 144 LEDs — fire at full brightness | ~1.9 A | scaled from the measurement, not from white |
 | Strip, 144 LEDs — all white, full brightness | ~8.6 A | arithmetic; not reachable on this supply by a factor of four |
 | TalentCell USB ceiling | **2.0 A** | **~60 % headroom at the approved look** |
 
-> **The arithmetic in the first version of this table was wrong by nearly 2×**, and it is worth
-> saying why rather than quietly fixing the number. It predicted ~1.5 A from the manual's
-> 0.12 W/LED scaled by 110/255. **That is the figure for WHITE.** This fire is amber and red at
-> partial heat and never goes white, so the real draw is a little over half of it. Any future
-> "what will it draw" question should be answered with `pwr` and a meter, not with W/LED.
+> **Two lessons, both paid for by getting this table wrong first.**
+>
+> **1. Measure a breathing effect over time.** A single spot reading of 0.80 A briefly had this
+> file claiming FastLED's model ran 20–35 % high. It was one instant of a fire that breathes at
+> ~1.1 Hz; the averaged figure is 1.0–1.2 A, which *agrees* with the estimate. A glance at a USB
+> meter lands anywhere in the swing.
+>
+> **2. The model's accuracy depends on COLOUR, and that explains the white row.** For the amber
+> fire, estimate and meter match. For solid white the cap holds the modelled draw at 1500 mA while
+> the meter reads **1.14 A** — the model running ~30 % high. `setCorrection(TypicalLEDStrip)`
+> scales green to ~69 % and blue to ~94 % of what is asked, and `calculate_unscaled_power_mW`
+> does not know it happened. A red-and-amber fire barely uses the corrected channels, so it is
+> barely affected; white uses all three, so it is affected most. **The error is always in the safe
+> direction** — a real frame is at or below what `pwr` claims, never above.
 
 **⚠ Every strip number in that table is arithmetic, not a measurement.** The firmware answers the
 same question about the frame that is actually on the strip:
@@ -430,18 +444,25 @@ cap — not `brightness` — is setting the level of what you are looking at. `s
 plus `capped=1` for the limiting case, because reading it over serial reboots the board and
 answers about the compiled defaults.
 
-**A meter on the supply reads BELOW `estMA`, not above it** — measured 0.80 A total against an
-estimate of 0.89–1.19 A for the LEDs alone. FastLED's model counts LEDs only, at an assumed
-5.0 V, and does not know about `setCorrection(TypicalLEDStrip)`, which scales what actually
-reaches the pixels. So **the estimate errs high, which is the safe direction for a cap**: a real
-frame is further from the limit than `pwr` claims, never closer. A meter reading far *above* it
-would mean the model's assumptions are wrong, and then the meter wins.
+**A meter agrees with `estMA`, once it is averaged.** 1.0–1.2 A at the supply against an estimate
+of 0.89–1.19 A for the LEDs alone, and the ~45 mA the XIAO takes accounts for the rest. The model
+counts LEDs only at an assumed 5.0 V and does not know about `setCorrection(TypicalLEDStrip)`, so
+some disagreement would be unsurprising — there is not much.
 
-**The cap is still a distant guard rail — the prediction that it would start biting was wrong.**
-It was a reasonable fear: at 50 pixels the limiter was inert and `brightness` alone set the level,
-and the arithmetic said 144 pixels would sit within a few percent of 1500 mA. Measured, it is not
-close. `pwr` sampled fourteen times across the resting fire reported **887–1185 mA with `allowed`
-equal to `brightness` every single time** — never once `LIMITING`.
+**Read the meter over time, not at a glance.** The fire breathes at ~1.1 Hz and speech blacks it
+out between words, so an instantaneous reading lands anywhere in that swing: one spot sample of
+0.80 A is what sent an earlier revision of this file to the wrong conclusion.
+
+**The cap bites — but only for the modes that light the whole strip at once.** This section has
+said both "it will" and "it never does", and neither was right.
+
+For the **approved fire**, it does not: `pwr` sampled fourteen times across the resting ambient
+fire reported **887–1185 mA with `allowed` equal to `brightness` every single time**. That is the
+look a greeting runs in, so the effect the prop performs is never being held down.
+
+For **whole-strip modes it plainly does.** `motion breathe` samples at 1400–1489 mA with
+`capped=1` on about half of them, and a solid white lamp is pinned at the cap outright. Those
+modes drive every pixel to full together, where the fire only ever drives some of them there.
 
 **Speech makes it draw LESS, which is the half nobody predicted.** The peaks were supposed to be
 the word flashes; sampling during `speak` gave the lowest numbers of the session, 427–987 mA.
@@ -454,19 +475,19 @@ true then: if the fire ever looks like it is fighting itself, **lower `brightnes
 reports headroom**; do not raise `maxMA` past what the supply can deliver, because a brownout
 part-way along a WS2812B run reads as random colour, not as dimming.
 
-**Runtime, barely dented.** The measured 4 W is the whole build. The TalentCell's 5 V rail is
-rated 12000 mAh (~60 Wh), call it ~52 Wh usable:
+**Runtime, comfortably a night.** The measured ~5.5 W at rest is the whole build. The TalentCell's
+5 V rail is rated 12000 mAh (~60 Wh), call it ~52 Wh usable:
 
 | | Draw | Runtime |
 |---|---|---|
-| 144 px, fire at `brightness 110` | **~4 W measured** | **~13 h** |
-| 144 px, fire at `brightness 70` | ~2.7 W | ~19 h |
+| 144 px, fire at rest, `brightness 110` | **~5.5 W measured** | **~9 h** |
+| 144 px, during a greeting | ~4 W measured | *(the show's average sits below the idle figure)* |
+| 144 px, fire at `brightness 70` | ~3.7 W | ~14 h |
 | *(50 px, fire at `brightness 110` — what this was)* | ~3 W | *~17 h* |
 
-A 5–6 hour night is covered about twice over. The earlier revision of this section predicted
-~6.5 h and told you to charge between nights; that came from the same white-LED arithmetic as the
-current budget above and was pessimistic by a factor of two. Charging between nights is still a
-good habit, but it is no longer load-bearing.
+A 5–6 hour night is covered with room to spare, and **a busy night is cheaper than a quiet one** —
+the bar spends a greeting darker than it spends its idle. Charging between nights is a good habit
+rather than a requirement.
 
 **Set the FastLED cap to 1500 mA, not 1700** — the cap governs only the LEDs, so leaving 500 mA
 covers the XIAO plus converter tolerance:

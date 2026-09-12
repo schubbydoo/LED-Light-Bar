@@ -87,14 +87,14 @@ exactly what you want for signal integrity.
 ~72 Wh nominal. Charges from its own 12.6 V 1 A charger in about 6 hours. Physical power button.
 
 **Runtime, at 144 pixels — measured.** The 1.256 A figure was the 50-pixel run on the SP002E. On
-this build, with all 144 lit and the fire at `brightness 110`, a USB meter reads **5.05 V /
-~0.80 A ≈ 4 W** for the whole thing, XIAO included. The 5 V rail is rated 12000 mAh (~60 Wh); call
-it **~52 Wh usable**, which gives **~13 h** — barely down from ~17 h at 50 pixels, because a fire
-is amber at partial heat rather than white. Comfortably more than the 20,000 mAh phone bank this
-replaces, and a 5–6 hour night is covered about twice over. *An earlier revision of this paragraph
-predicted ~6.5 h from W/LED arithmetic and told you the margin was one night; measuring it showed
-that was pessimistic by 2×.* Full numbers in `02-build-and-power.md`. It still kills a whole
-category of problem:
+this build, with all 144 lit and the fire at rest, an averaged USB meter reads **~1.0–1.2 A
+(~5.5 W)** for the whole thing, XIAO included — and **~0.7–0.8 A during a greeting**, since the
+speech effect blacks the strip out between words. The 5 V rail is rated 12000 mAh (~60 Wh); call
+it **~52 Wh usable**, which gives **~9 h**. Comfortably more than the 20,000 mAh phone bank this
+replaces, and a 5–6 hour night is covered with room to spare. *Earlier revisions of this paragraph
+said ~6.5 h (from W/LED arithmetic for white pixels) and then ~13 h (from one spot meter reading
+taken mid-breath). An averaged reading is the one to trust.* Full numbers in
+`02-build-and-power.md`. It still kills a whole category of problem:
 
 **No auto-shutoff to design around.** These packs are built for continuous low-draw loads — CCTV
 cameras, LED strips — and switch on and off with a physical button rather than by sensing load. So
@@ -102,10 +102,10 @@ the trickle-mode hunt and the firmware idle-floor hack are both off the table. *
 bench with the USB power meter anyway* — run the box at a dim idle for half an hour and confirm it
 doesn't drop out. Cheap certainty.
 
-**⚠ The one constraint: 2 A on the USB output — with more room than expected.** The fire at
-`brightness 110` *measures* ~0.80 A, about 40 % of the ceiling, so the 1500 mA cap remains a
-distant guard rail rather than something in the effect's path — `pwr` has never once reported
-`LIMITING`. At full brightness the same fire would want ~1.9 A, and
+**⚠ The one constraint: 2 A on the USB output.** The fire at rest *measures* ~1.0–1.2 A, around
+55 % of the ceiling, so the 1500 mA cap is a guard rail rather than something in the effect's
+path — `pwr` has never once reported `LIMITING`. At full brightness the same fire would want
+~2.6 A, which this supply cannot deliver, and
 `fill_solid(CRGB::White)` on 144 WS2812Bs is **8.6 A** — four times what this supply can deliver.
 Guard it in firmware rather than by remembering:
 
