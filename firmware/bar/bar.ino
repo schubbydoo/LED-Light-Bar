@@ -329,6 +329,18 @@ static CRGBPalette16 palette = pal_fire;
 // ---------------------------------------------------------------------------
 struct Params {
   // ---- the BAR ITSELF ---------------------------------------------------
+  // LEDs per METRE — how addressable strip is universally specified, by every
+  // vendor, on every reel. The standard densities are 30, 60, 74, 96, 144 and
+  // (in the smaller 2020 package) 160 and 256; 100/m turns up on some 5 V
+  // reels. So density is the fact printed on the box, and LENGTH is what a
+  // tape measure gives you — the pixel COUNT is the thing neither of them
+  // states, and the thing this firmware actually needs.
+  //
+  // Here rather than only in the box because `len` has to convert, and a
+  // conversion against a hard-coded 144 is silently wrong on any other reel:
+  // it would report 39" for a 60/m strip that is really 94" long. The box
+  // keeps a believed copy the same way it does for every other parameter.
+  uint16_t ledsPerM = 144;
   // Not a look — the physical length of the run, in pixels, at 144 LED/m. It
   // lives in Params because it has to survive a power cycle (`save`) and be
   // settable over the radio: the diffuser is flexible, so the bar is contoured
@@ -506,13 +518,13 @@ static void buildGamma();          // defined below; clearParams needs it
 
 static Preferences prefs;
 static const char*    NVS_NS        = "bar";
-// Bumped to 2 when the lamp fields joined Params, to 3 when `maxMA` did, and to
-// 4 when `numLeds` did. A stored older blob is ignored rather than
+// Bumped to 2 when the lamp fields joined Params, to 3 when `maxMA` did, to 4
+// when `numLeds` did, and to 5 for `ledsPerM`. A stored older blob is ignored rather than
 // reinterpreted — see loadParams(). The size guard would have caught these on
 // its own; the version is bumped anyway, because a saved cap or length that no
 // longer means what it did is exactly the kind of value that is individually
 // plausible and collectively wrong.
-static const uint16_t PARAMS_VERSION = 4;
+static const uint16_t PARAMS_VERSION = 5;
 
 // The compiled values, captured before anything is loaded over them. `forget`
 // needs somewhere to go back to, and re-deriving them would mean maintaining a
@@ -1003,9 +1015,10 @@ void setup() {
   }
   Serial.print  (F("pixels   : ")); Serial.print(P.numLeds);
   Serial.print  (F(" of ")); Serial.print(MAX_LEDS);
-  Serial.print  (F(" max = ")); Serial.print(P.numLeds / 144.0f * 39.37f, 1);
-  Serial.print  (F("\" (")); Serial.print(P.numLeds / 144.0f, 2);
-  Serial.println(F(" m at 144/m) — `len <inches>` or `set leds <n>`"));
+  Serial.print  (F(" max = ")); Serial.print(P.numLeds * 39.37f / P.ledsPerM, 1);
+  Serial.print  (F("\" (")); Serial.print((float)P.numLeds / P.ledsPerM, 2);
+  Serial.print  (F(" m at ")); Serial.print(P.ledsPerM);
+  Serial.println(F("/m) — `len <inches>` or `set leds <n>`"));
   Serial.print  (F("LED cap  : ")); Serial.print(P.maxMA);
   Serial.println(F(" mA at 5 V — `pwr` for the estimate against a meter"));
   Serial.print  (F("my MAC   : ")); Serial.println(WiFi.macAddress());
@@ -1045,6 +1058,8 @@ static void showParams() {
   Serial.print(F("brightness    ")); Serial.println(P.brightness);
   Serial.print(F("maxMA         ")); Serial.println(P.maxMA);
   Serial.print(F("leds          ")); Serial.println(P.numLeds);
+  Serial.print(F("density       ")); Serial.print(P.ledsPerM);
+  Serial.println(F(" LED/m"));
   Serial.print(F("env (live)    ")); Serial.println(env, 3);
 }
 
@@ -1085,6 +1100,13 @@ static bool setParam(const String& k, float v) {
   // than this build can drive and getting the most it can, with `show`/`st`
   // saying what you actually got. Zero would divide by zero in the ends check
   // and render nothing, so the floor is 1.
+  // The reel's density. Range is generous rather than a menu — vendors ship
+  // odd ones (74/m is real), and a firmware that refused an unfamiliar number
+  // would be wrong more often than the person holding the reel.
+  else if (k == "density" || k == "ledsPerM") {
+                                if (v < 1) v = 1;
+                                if (v > 1000) v = 1000;
+                                P.ledsPerM = (uint16_t)v; }
   else if (k == "leds" || k == "numLeds") {
                                 if (v < 1) v = 1;
                                 if (v > MAX_LEDS) v = MAX_LEDS;
@@ -1204,6 +1226,7 @@ static void handleLine(String line) {
                // colour six tokens down, and one key meaning two things in one
                // line is how a parser that splits on `=` gets quietly wrong.
                + " leds=" + String(P.numLeds)
+               + " perM=" + String(P.ledsPerM)
                + " breath=" + String(P.breathHz, 2)
                + " rel=" + String(P.release, 3)
                + " gain=" + String(P.speechGain, 2)
@@ -1268,13 +1291,16 @@ static void handleLine(String line) {
   if (verb == "len") {
     if (rest.length()) {
       float inches = rest.toFloat();
-      // 144 LED/m over 39.37 in/m = 3.6576 pixels per inch.
-      float px = inches * 144.0f / 39.37f;
+      // Against the CONFIGURED density, not a hard-coded 144 — that is the
+      // whole reason density lives here.
+      float px = inches * P.ledsPerM / 39.37f;
       if (refuseBadLength(px, "that length")) return;
       setParam("leds", px);            // clamps the top end
     }
-    String out = "len " + String(P.numLeds / 144.0f * 39.37f, 1) + "in leds="
-               + String(P.numLeds) + " max=" + String(MAX_LEDS);
+    String out = "len " + String(P.numLeds * 39.37f / P.ledsPerM, 1) + "in ("
+               + String((float)P.numLeds / P.ledsPerM, 2) + "m) leds="
+               + String(P.numLeds) + " perM=" + String(P.ledsPerM)
+               + " max=" + String(MAX_LEDS);
     Serial.println(out);
     linkSend(out);
     return;
@@ -1328,6 +1354,7 @@ static void handleLine(String line) {
     Serial.println(F("set brightness 70    less light reads as MORE saturated"));
     Serial.println(F("set maxMA 1500       LED current cap; 1700 is the supply's limit"));
     Serial.println(F("set leds <n>         how many pixels the bar actually is"));
+    Serial.println(F("set density <n>      LEDs per metre of the reel (30/60/96/144...)"));
     Serial.println(F("len [inches]         the same, in inches; no arg just asks"));
     Serial.println(F("ends                 light pixel 0 and the last one, 15s"));
     Serial.println(F("idle                 release the hold, stop speaking"));
