@@ -38,7 +38,8 @@ numbers and opens a mouth with them.
 | | |
 |---|---|
 | Controller | Seeed **XIAO ESP32C3** in the bar; a second one on the Pi's USB as an ESP-NOW bridge |
-| Strip | **WS2812B, 144 LED/m**, cut to ~14" ≈ **50 pixels**, black PCB, IP30 |
+| Strip | **WS2812B, 144 LED/m**, the whole ~1 m (3.2 ft) = **144 pixels**, black PCB, IP30 |
+| Length | **a setting, not a constant** — `len <inches>` / `set leds <n>`, 1..144; 144 is the buffer |
 | Optics | 45° corner-mount aluminium channel + frosted diffuser (also the heatsink) |
 | Level shift | **SN74AHCT125N** — the T is not optional |
 | Power | **TalentCell YB1206000-USB**, 5 V USB out, **2 A ceiling** |
@@ -55,11 +56,36 @@ numbers and opens a mouth with them.
   kills the first pixel instantly.
 - **Two colour conventions coexist.** The tether is red/black; the strip's JST loom is
   brown/green/white. A red wire and a brown wire both land on +5 V. Don't "fix" one.
-- **The 2 A supply ceiling is real, and still is.** Measured draw is **1.256 A** (peak across
-  every SP002E test pattern, 2026-09-09) — comfortable. But those patterns never lit all 50
-  pixels white at once, so the **3 A all-white case remains untested**. Guard it in firmware:
+- **The 2 A supply ceiling is real, and at 144 pixels it is CLOSE.** The 1.256 A measurement
+  (peak across every SP002E test pattern, 2026-09-09) was the 50-pixel strip and no longer
+  describes this build. The whole strip running the fire at `brightness 110` estimates **~1.5 A**,
+  or 75 % of the ceiling; at full brightness the same fire wants ~3.5 A and all-white wants
+  ~8.6 A, which this supply cannot deliver. Guard it in firmware:
   `FastLED.setMaxPowerInVoltsAndMilliamps(5, 1500)` — 1500, not 1700, because the cap governs
-  only the LEDs and the XIAO needs the rest.
+  only the LEDs and the XIAO needs the rest. It is live as `set maxMA`.
+- **The power cap is now part of the EFFECT, not just the electrics.** At 50 pixels the frame
+  never approached 1500 mA, so FastLED's limiter was inert. At 144 the approved look sits within
+  a few percent of it, so the *bright* frames — a breath peak, a word flash — are the ones held
+  down: a dynamic dim that moves against the effect and reads as the fire fighting itself. Ask
+  `./send.sh bar pwr` (or read `mA=`/`!` in `st`); `LIMITING` means the cap set the level, not
+  `brightness`. The fix is a lower `brightness`, never a `maxMA` above what the supply delivers —
+  a brownout part-way along a WS2812B run reads as random colour, not as dimming.
+- **A full metre includes the strip's factory solder joint at 50 cm** (around pixel 72), which
+  the 14" cut avoided. It carries everything past it and is the first suspect if the far half of
+  the strip drops out, dims, or shifts colour while the near half is clean.
+- **The length is live and persisted, because the diffuser is flexible.** The rigid diffuser could
+  only be the 14" it was cut to; the 2026 one contours, so the bar gets re-cut per prop and
+  `numLeds` is a fact about the SEASON rather than the build. `len 24` (inches) or `set leds 88`,
+  then `save`. **`ends` is the only verification** — first and last pixel, 15 s, nothing between:
+  the renderer draws whatever length it is told and cannot notice it is wrong. `MAX_LEDS` (144)
+  sizes the buffers and *is* a recompile; the whole buffer is clocked out at any length, so a
+  shorter bar buys draw, not frame time.
+- **`flareMeanS` is the one tuned value the longer strip invalidated.** Its rate is per *strip*,
+  so 3.5 s judged by eye across 14" is a third of the crackle density across 39". `spaceScale`
+  and `flareWidth` are per-*pixel* and needed nothing — the fire keeps its grain and gets more of
+  it. Left at the approved number rather than silently retuned; `set flareMeanS 1.2` restores the
+  old density, by eye, on the prop. Now that the length is a setting this cuts both ways: a
+  SHORTER bar wants a LARGER `flareMeanS` to read the same, and nothing scales it for you.
 - **Colour order is GRB.** FastLED's default for WS2812B, but confirmed rather than assumed.
 - **Strip is rated −20 to +40 °C.** A sealed tiki mouth in Florida sun exceeds that with no
   power applied. Night prop only.
@@ -111,7 +137,10 @@ see **Persistence** below.
 
 **Hardware: verified, and the wiring is done.** The strip was smoke-tested on its bundled
 SP002E controller — all 50 pixels light, and the power path through the single JST is proven at
-**1.256 A measured**, with no firmware involved. Wire colours were metered to the silkscreened
+**1.256 A measured**, with no firmware involved. *That was the 50-pixel run: the build lights all
+144 as of 2026-09-12, and neither the far half of the strip nor its mid-run solder joint has been
+through that test. The SP002E drives 600 pixels, so repeating it on the full strip is still the
+cheapest way to separate a bad strip from bad code.* Wire colours were metered to the silkscreened
 pads and match what the diagrams show. Steve reports the light-bar wiring complete as of
 2026-09-09. That gate is closed; don't re-open it, and don't propose wiring changes.
 

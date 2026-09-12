@@ -60,6 +60,9 @@ belong on a machine whose day job is running a prop.
 
 ./send.sh bridge "amb water"    # over the AIR — this is the one you want
 ./send.sh bridge st             # one-line state, answered over the air
+./send.sh bridge pwr            # estimated draw vs the cap, also over the air
+./send.sh bridge "len 24"       # the bar is 24 inches this season
+./send.sh bridge ends           # ...prove it: first and last pixel, 15s
 ./send.sh bar show              # every live parameter (resets the board, see below)
 ./send.sh bar "set breath 1.4"  # change one and watch it happen
 ./send.sh bar "speak 4"         # synthetic speech envelope, no radio needed
@@ -83,9 +86,56 @@ worth keeping, and the bar is never interrupted — so settings accumulate:
    bar> st amb=fire y=0.75 br=90 breath=1.10 rel=0.080 gain=1.20 env=0.00
 ```
 
-`st` is the only reply that comes back over the air, and it exists because
+`st` and `pwr` are the replies that come back over the air, and they exist because
 `show` cannot: reading the bar's own serial to check what you just set reboots it
 first, so the answer is always the defaults.
+
+### Asking what it draws
+
+All 144 pixels are lit as of 2026-09-12, and that puts the approved look within a
+few percent of the 1500 mA cap. So "is the limiter dimming me?" became a question
+about the *look*, and it cannot be answered by reading the source — it depends on
+the frame on the strip right now:
+
+```
+./send.sh bridge pwr
+   bar> pwr leds=144 br=110 allowed=110 wantMA=1487 capMA=1500 estMA=1487 headroom (+~45mA XIAO, not counted)
+```
+
+`wantMA` is what this frame would draw at `brightness`; `estMA` is what the cap
+allows it. **`LIMITING` instead of `headroom` means the cap set the level of what
+you are looking at, not `brightness`** — a dim that moves against the effect, so
+the fix is a lower `brightness` rather than a higher `maxMA`. `st` carries `mA=`
+with a `!` for the limiting case, so the routine one-liner shows it too.
+
+`set maxMA <mA>` moves the cap live, which is what makes a USB meter usable: the
+estimate is FastLED's model of the LEDs only, at an assumed 5.0 V, so a meter on
+the supply should read somewhat *above* `estMA`. Far above means the model is
+wrong and the meter wins. Never set it above what the supply delivers — a
+brownout part-way along a WS2812B run reads as random colour, not as dimming.
+
+### Telling it how long the bar is
+
+The renderer draws whatever length it is told and **cannot notice it is wrong**. Since the
+diffuser became flexible the bar gets contoured to each prop, so the length is a setting:
+
+```
+./send.sh bridge "len 24"       # inches — what a tape measure reads
+   bar> len 24.1in leds=88 max=144
+./send.sh bridge "set leds 88"  # the same thing, in the unit the strip has
+./send.sh bridge ends           # pixel 0 and pixel 87, dim, 15s, nothing between
+./send.sh bridge save           # or the next battery change forgets it
+```
+
+**`ends` is the verification, and there is no other one.** The far marker should land at the
+physical end of the diffuser: short of it, the number is low; no far marker at all and it is
+high, addressing pixels that are not there. The near marker is amber and the far one blue
+because the question is *where the far one is*, and both are deliberately dim — a white marker
+blooms through a diffuser by enough to move the answer an inch.
+
+**144 is MAX_LEDS**, the buffer size, and that one *is* a recompile. The whole buffer is clocked
+out at any length, so a shorter bar buys no frame time; what it does buy is proportionally less
+draw, which `pwr` reports without any arithmetic on your part.
 
 Several commands in one connection also works — `send.sh bar "set a 1" "set b 2"
 st` — which is the workaround when the radio is not an option.
@@ -165,7 +215,13 @@ connected last.
    whole level-shifter stage at once — the D10 wire, 1OE actually grounded, VCC
    actually 5 V, and the part actually being an HCT rather than an HC.
 2. **`bringup`, strip connected.** One pixel, then colour order, then a walk down
-   the run, then the ends, then the whole strip under load.
+   the run, then the ends, then the whole strip under load. The walk now takes
+   ~14 s rather than 6 (144 pixels at 90 ms), so that stage holds longer than the
+   others; stage 4 — first and last pixel only — is the one that says whether
+   the length matches the strip, and nothing in the firmware can tell
+   otherwise. `bringup` tests MAX_LEDS — the whole buffer — because it is for a
+   strip with no radio on it yet; once `bar` is running, `ends` asks the same
+   question about the length actually set.
 3. `bar` — the fire.
 
 `metercheck` parks D10 as an input for its first ten seconds. Driving a pin into

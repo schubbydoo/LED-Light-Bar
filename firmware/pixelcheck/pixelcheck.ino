@@ -4,7 +4,7 @@
   Written after `bringup` found two things on the first strip test:
 
     * pixel 0 shows red and blue but not green
-    * the walking dot was hard to follow, so "all 50 addressable" is unconfirmed
+    * the walking dot was hard to follow, so "all 144 addressable" is unconfirmed
 
   Under GRB, **green is the first byte of the first pixel** — the most exposed
   byte in the entire frame, and the one a marginal first edge eats. So "pixel 0
@@ -28,7 +28,7 @@
     1  WHOLE STRIP RED      every pixel, red
     2  WHOLE STRIP GREEN    <-- THE ONE THAT MATTERS
     3  WHOLE STRIP BLUE
-    4  MARKERS              pixels 0, 10, 20, 30, 40, 49 in white, held
+    4  MARKERS              six pixels spread across the strip, white, held
     5  PIXEL 0 ALONE        red, then green, then blue
     6  PIXEL 1 ALONE        red, then green, then blue
     7  SLOW WALK            400 ms per pixel, slow enough to follow
@@ -64,7 +64,8 @@
 #include <FastLED.h>
 
 #define DATA_PIN     D10
-#define NUM_LEDS     50
+// The WHOLE strip: 144 LED/m over the full ~1 m run.
+#define NUM_LEDS     144
 #define LED_TYPE     WS2812B
 #define COLOR_ORDER  GRB
 #define MAX_MILLIAMPS 1500
@@ -76,8 +77,16 @@
 
 CRGB leds[NUM_LEDS];
 
-static const uint16_t MARKERS[] = {0, 10, 20, 30, 40, NUM_LEDS - 1};
-static const uint8_t  N_MARKERS = sizeof(MARKERS) / sizeof(MARKERS[0]);
+// Six markers SPREAD over whatever the strip is, rather than every tenth pixel.
+// Fixed tenths were six evenly spaced markers on 50 pixels and would be five
+// bunched in the first third of 144 with one far away at the end — which asks
+// you to judge a gap instead of counting to six.
+static const uint8_t  N_MARKERS = 6;
+static uint16_t MARKERS[N_MARKERS];
+static void buildMarkers() {
+  for (uint8_t m = 0; m < N_MARKERS; m++)
+    MARKERS[m] = (uint16_t)((uint32_t)m * (NUM_LEDS - 1) / (N_MARKERS - 1));
+}
 
 static const uint32_t HOLD_MS = 4000;
 static uint8_t  stage = 0;
@@ -89,6 +98,7 @@ void setup() {
   uint32_t t0 = millis();
   while (!Serial && millis() - t0 < 2000) { delay(10); }
 
+  buildMarkers();
   FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS)
          .setCorrection(TypicalLEDStrip);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS);
@@ -98,6 +108,7 @@ void setup() {
   Serial.println();
   Serial.println(F("=== Pixel check — where exactly is the fault? ============="));
   Serial.println(F("Nothing moves in this test. Every state is held 4s."));
+  Serial.print  (F("pixels: ")); Serial.println(NUM_LEDS);
   Serial.println(F("The question that matters is stage 2: whole strip green."));
   Serial.println(F("  green everywhere but pixel 0 -> the fault is pixel 0 alone"));
   Serial.println(F("  no green anywhere           -> colour order or the wire"));
@@ -148,7 +159,11 @@ void slowWalk() {
 
 void loop() {
   uint32_t hold = (stage == 4 || stage == 5) ? 4200
-                : (stage == 6)               ? 21000    // 50 x 400ms + margin
+                // Derived, not a constant: at 400 ms a pixel the walk takes
+                // NUM_LEDS * 400 ms, which is 21 s at 50 pixels and 58 s at
+                // 144. A fixed 21 s would stop the dot a third of the way
+                // along and look identical to the run giving out there.
+                : (stage == 6)               ? (uint32_t)NUM_LEDS * 400 + 1000
                                              : HOLD_MS;
 
   if (!announced) {
@@ -159,8 +174,12 @@ void loop() {
       case 1: Serial.println(F("WHOLE STRIP GREEN  <-- look at pixel 0 "
                                "against the rest")); break;
       case 2: Serial.println(F("WHOLE STRIP BLUE")); break;
-      case 3: Serial.println(F("MARKERS — 0, 10, 20, 30, 40, 49 in white, held. "
-                               "Count six, and check the last is the last.")); break;
+      case 3: Serial.print(F("MARKERS — white and held at "));
+              for (uint8_t m = 0; m < N_MARKERS; m++) {
+                Serial.print(MARKERS[m]);
+                if (m + 1 < N_MARKERS) Serial.print(F(", "));
+              }
+              Serial.println(F(". Count six, and check the last is the last.")); break;
       case 4: Serial.println(F("PIXEL 0 ALONE")); break;
       case 5: Serial.println(F("PIXEL 1 ALONE — the control for pixel 0")); break;
       case 6: Serial.println(F("SLOW WALK — 400ms per pixel, easy to follow")); break;

@@ -64,12 +64,14 @@ taps off those. This is what carries 1.2 A without the board's own resistance ea
 three loads — strip, buffer, XIAO — each tap the bus separately. Never daisy-chain
 XIAO → buffer → strip; strip current must not flow through a logic ground path.
 
-**3. Keep the strip's power and the strip's data on opposite halves.** 1.2 A switching at video
-rates next to a data line is how you get flicker that looks like a code bug. Power on the bus
+**3. Keep the strip's power and the strip's data on opposite halves.** 1.5 A switching at video
+rates next to a data line is how you get flicker that looks like a code bug — and at 144 pixels
+that is 1.5 A rather than the 1.2 A this rule was written for. Power on the bus
 rows, data across the middle, and cross them at right angles if you must cross at all.
 
 **4. The 1000 µF sits at the output connector**, not at the tether input. Its job is absorbing
-inrush when 50 pixels jump at once — it can only do that from the strip side.
+inrush when 144 pixels jump at once — it can only do that from the strip side, and the step it
+has to absorb is three times what it was sized against.
 
 **5. 0.1 µF physically touching the socket's pins 14 and 7.** Not "somewhere on the 5 V bus."
 Decoupling caps only work when they're inches of wire closer than the bulk cap.
@@ -139,14 +141,15 @@ strip; trim the spare power pigtail off and heat-shrink those two wires individu
 
 | JST pin | Wire on this strip | Carries | From |
 |---|---|---|---|
-| 1 | **brown** | **+5 V, ~1.2 A** | +5 V bus (star point) |
+| 1 | **brown** | **+5 V, ~1.5 A** | +5 V bus (star point) |
 | 2 | green | DIN, 5 V logic | socket pin 3 → 470 Ω |
-| 3 | white | **GND return, ~1.2 A** | GND bus |
+| 3 | white | **GND return, ~1.5 A** | GND bus |
 
 *(Pin order above is the working assumption — confirm it against the silkscreen with the meter.)*
 
-JST SM is rated **3 A per contact**, and the measured 1.256 A sits at 42 % of rating; the
-1500 mA FastLED cap holds it there. The vendor's own SP002E controller powers the strip the same way.
+JST SM is rated **3 A per contact**. At 50 pixels the measured 1.256 A sat at 42 % of rating; at
+**144 pixels the estimate is ~1.5 A, or 50 %**, and the 1500 mA FastLED cap is what holds it
+there rather than headroom doing it. The connector is still comfortable — the cap is the reason. The vendor's own SP002E controller powers the strip the same way.
 
 Because two of these contacts now carry the full strip current, **run them from the bus wires
 directly** — don't tap them off a shared leg with the XIAO or the buffer. And keep the 1000 µF
@@ -180,7 +183,7 @@ and gives the tether something to anchor to.
 Build it in stages and power up between each — finding a fault on a board with four parts is much
 easier than on a board with nine.
 
-1. ~~**Smoke-test the strip with the SP002E first.**~~ **✅ Done 2026-09-09** — all 50 pixels lit, power path proven. Start at step 2.
+1. ~~**Smoke-test the strip with the SP002E first.**~~ **✅ Done 2026-09-09** — all 50 pixels lit, power path proven. Start at step 2. *(That test was the 50-pixel run; the build now lights all 144, and neither the far half nor its mid-run solder joint has been through it. Worth repeating on the full strip — the SP002E drives 600.)*
 2. Solder the bus wires and the tether pads. **Power up with nothing else fitted** and confirm
    5 V on the bus with the meter, correct polarity.
 3. Add the socket, decoupling cap, and the 5 V/GND legs. Power up. **Confirm 5 V on socket pin 14

@@ -78,17 +78,70 @@
 #include <esp_wifi.h>
 
 #define DATA_PIN      D10
-#define NUM_LEDS      50
+
+// HOW LONG THE BAR IS — a ceiling here, the actual length in `P.numLeds`.
+//
+// MAX_LEDS sizes the BUFFERS and is a compile-time fact: it is the longest run
+// this build can drive, and it is 144 because that is the whole 1 m strip on
+// hand at 144 LED/m. The length actually rendered is `P.numLeds`, which is live
+// and persisted — `set leds 96`, or `len 24` in inches — because the diffuser
+// is flexible and the bar gets contoured to whatever prop it visits. A season
+// that wants 20" of it should not need a toolchain.
+//
+// Pixels from `P.numLeds` to MAX_LEDS are written BLACK every frame rather than
+// left out of the frame. FastLED clocks the whole buffer either way, so leaving
+// them alone would hold the last image on the tail forever; and the clocked-out
+// bytes simply fall off the end of a shorter physical strip, which costs a few
+// hundred microseconds and nothing else.
+//
+// Almost nothing in the renderer scales with the count — `spaceScale` and
+// `flareWidth` are per-pixel, so the fire keeps its grain at any length and
+// simply gets more or less of it (see the notes on both). `flareMeanS` is the
+// exception and is per-STRIP: a shorter bar wants a LARGER value to read the
+// same, and it is not scaled automatically because it is judged by eye. What
+// does scale, and scales hard, is the electrical side:
+//
+//   * DRAW IS PER PIXEL, so it tracks the length directly. 50 px of fire at
+//     brightness 110 estimates ~0.5 A; 144 px estimates ~1.5 A, which is this
+//     build's cap and about 75 % of the TalentCell's 2 A USB ceiling. Shorten
+//     the bar and that falls proportionally. `pwr` prints the estimate for the
+//     CURRENT length so a meter has something to disagree with, and `st`
+//     carries it too — because reading it over serial reboots the board and
+//     answers about the defaults instead.
+//   * THE CAP NOW BITES. At 50 px the frame never approached 1500 mA, so
+//     FastLED's limiter was inert and `brightness` alone set the level. At
+//     144 px the bright frames — a breath peak, a word flash — are what get
+//     held down, which is a dim that moves AGAINST the effect. If the fire
+//     starts to look like it is fighting itself, lower `brightness` until
+//     `pwr` reports headroom rather than raising `maxMA` past the supply.
+//
+// VERIFYING THE LENGTH: nothing in the firmware can tell whether `numLeds`
+// matches the strip. `ends` lights the first and last pixel of the current
+// length and nothing between — set a length, run `ends`, and move it until the
+// far marker sits where the bar ends. `bringup` stage 4 and `pixelcheck`'s
+// markers do the same thing at MAX_LEDS, for a strip with no radio on it yet.
+#define MAX_LEDS      144
 #define LED_TYPE      WS2812B
 #define COLOR_ORDER   GRB
+// The compiled default for `maxMA`, which is live — see Params. 1500 and not
+// 1700, because the cap governs only the LEDs and the XIAO needs the rest.
 #define MAX_MILLIAMPS 1500
 
 // 100 FPS. The design doc asks for 60-100; the noise field wants the headroom
 // and the C3 drives the strip from the RMT peripheral, so this costs nothing.
+//
+// The arithmetic is worth writing down because it is a wall rather than a
+// slope, and it is set by MAX_LEDS rather than by `numLeds`: the whole buffer
+// is clocked out whatever the bar's length, so shortening the bar does NOT buy
+// frame time. WS2812B clocks at 800 kHz, so one frame is MAX_LEDS * 24 bits =
+// 4.3 ms at 144 — inside the 10 ms budget but no longer a rounding error (it
+// was 1.5 ms at 50). Raising MAX_LEDS to a second metre would put it at 8.6 ms
+// and 100 FPS would stop being achievable — at which point lower FPS is the
+// answer, not a faster loop.
 static const uint8_t  FPS = 100;
 static const uint32_t FRAME_US = 1000000UL / FPS;
 
-CRGB leds[NUM_LEDS];
+CRGB leds[MAX_LEDS];
 
 // ---------------------------------------------------------------------------
 // The link.
@@ -262,12 +315,31 @@ static CRGBPalette16 palette = pal_fire;
 // The knobs. Defaults are docs/01 §8; every one is settable at runtime.
 // ---------------------------------------------------------------------------
 struct Params {
+  // ---- the BAR ITSELF ---------------------------------------------------
+  // Not a look — the physical length of the run, in pixels, at 144 LED/m. It
+  // lives in Params because it has to survive a power cycle (`save`) and be
+  // settable over the radio: the diffuser is flexible, so the bar is contoured
+  // to each prop and its length is a property of the SEASON, not of the build.
+  // Clamped to MAX_LEDS on the way in; the tail beyond it is blacked each frame.
+  uint16_t numLeds  = MAX_LEDS;
   float emberFloor  = 0.12f;   // the fire never goes out
   float breathHz    = 1.1f;    // whole-strip breathing rate — TUNE FIRST
   float breathDepth = 0.45f;   // how far the breath swings brightness
-  float spaceScale  = 18.0f;   // noise units per pixel; ~3 features across 50
+  // Per PIXEL, which makes it a PHYSICAL scale rather than a fraction of the
+  // strip: at 144 LED/m, 18 puts a noise feature every ~4-5 inches whether the
+  // run is 14" or 39". So going to the whole strip keeps the fire's grain and
+  // gives it ~8 features instead of ~3, rather than stretching three of them
+  // over three times the length — which is what a fire three times as long
+  // actually does. Raising this shrinks features; it does not add them.
+  float spaceScale  = 18.0f;   // noise units per pixel; a feature every ~4-5"
   float timeScale   = 130.0f;  // noise units per second — slow is right
-  float flareMeanS  = 3.5f;    // mean seconds between crackles
+  // The rate is per STRIP, not per inch — and this is the one tuned value the
+  // longer run genuinely invalidates. 3.5 s was judged by eye across 14"; the
+  // same rate across 39" is a third of the crackle density, so the fire reads
+  // calmer than the one that was approved. ~1.2 restores the old density, but
+  // it is left at the approved number because it is judged by eye on the real
+  // surface and silently retuning it would hide the change.
+  float flareMeanS  = 3.5f;    // mean seconds between crackles, whole strip
   float flareRelease= 0.6f;    // seconds for a crackle to fade
   float flareWidth  = 4.0f;    // pixels, gaussian sigma
   // Lower than it was. Red now carries the speech, so the heat surge only has
@@ -362,6 +434,17 @@ struct Params {
   // cream. Less light reads as MORE saturated. Push it up on a dark, matte,
   // warm-toned surface where it has somewhere to go.
   uint8_t brightness= 110;
+  // THE LED CURRENT CAP, live, because at 144 pixels it became a number you set
+  // with a meter in your hand and a recompile per attempt makes that
+  // unmeasurable. FastLED scales the WHOLE FRAME to fit it, so this is a
+  // ceiling on the effect as much as on the battery.
+  //
+  // Raising it past what the supply can actually deliver buys no light: it buys
+  // a brownout, and a brownout part-way along a WS2812B strip reads as random
+  // colour rather than as dimming. The TalentCell's USB output is 2 A and the
+  // XIAO lives on the same rail, so ~1700 is the hard ceiling and 1500 is the
+  // one with margin in it.
+  uint16_t maxMA    = MAX_MILLIAMPS;
 
   // ---- the LAMP ---------------------------------------------------------
   // A prop does not always want speech. Sometimes it wants a red light that
@@ -410,9 +493,13 @@ static void buildGamma();          // defined below; clearParams needs it
 
 static Preferences prefs;
 static const char*    NVS_NS        = "bar";
-// Bumped to 2 when the lamp fields joined Params. A stored v1 blob is ignored
-// rather than reinterpreted — see loadParams().
-static const uint16_t PARAMS_VERSION = 2;
+// Bumped to 2 when the lamp fields joined Params, to 3 when `maxMA` did, and to
+// 4 when `numLeds` did. A stored older blob is ignored rather than
+// reinterpreted — see loadParams(). The size guard would have caught these on
+// its own; the version is bumped anyway, because a saved cap or length that no
+// longer means what it did is exactly the kind of value that is individually
+// plausible and collectively wrong.
+static const uint16_t PARAMS_VERSION = 4;
 
 // The compiled values, captured before anything is loaded over them. `forget`
 // needs somewhere to go back to, and re-deriving them would mean maintaining a
@@ -446,6 +533,13 @@ static void loadParams() {
     Params tmp;
     if (prefs.getBytes("params", &tmp, sizeof(tmp)) == sizeof(tmp)) {
       P = tmp;
+      // The one loaded value that can index an array. Version and size agree,
+      // so this cannot be a stale blob — but MAX_LEDS is a compile-time number
+      // and someone LOWERING it would leave a legitimately-saved length
+      // pointing past the end of `leds`, which is a memory fault rather than a
+      // wrong-looking fire. Cheap, and it fails toward the shorter bar.
+      if (P.numLeds < 1)        P.numLeds = 1;
+      if (P.numLeds > MAX_LEDS) P.numLeds = MAX_LEDS;
       uint8_t a = prefs.getUChar("amb", 0);
       if (a < N_AMBIENCE) ambIndex = a;
     }
@@ -463,6 +557,7 @@ static void clearParams() {
   P = DEFAULTS;
   ambIndex = 0;
   FastLED.setBrightness(P.brightness);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, P.maxMA);
   buildGamma();
 }
 
@@ -504,11 +599,19 @@ static const float   FLARE_ATTACK_S = 0.04f;
 struct Flare { bool live; float pos, amp, age; };
 static Flare flares[MAX_FLARES];
 
+// `ends` paints the first and last pixel of the CURRENT length and nothing
+// between, for a fixed spell. It is the only way to answer "does `numLeds`
+// match the strip?" without a toolchain — and it has to be a mode rather than
+// a one-shot draw, because the render loop repaints every pixel 100 times a
+// second and would wipe a single frame before anyone saw it.
+static uint32_t endsUntilMs = 0;
+static const uint32_t ENDS_MS = 15000;
+
 static void spawnFlare(float amp, float atPos = -1.0f) {
   for (uint8_t f = 0; f < MAX_FLARES; f++) {
     if (flares[f].live) continue;
     flares[f] = {true,
-                 atPos >= 0 ? atPos : (random16() / 65535.0f) * (NUM_LEDS - 1),
+                 atPos >= 0 ? atPos : (random16() / 65535.0f) * (P.numLeds - 1),
                  amp, 0.0f};
     return;
   }
@@ -833,7 +936,7 @@ static float noiseNorm(uint8_t raw) {
   return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
 }
 
-static float heat[NUM_LEDS];
+static float heat[MAX_LEDS];
 
 void setup() {
   Serial.begin(115200);
@@ -860,9 +963,15 @@ void setup() {
   fsReady = LittleFS.begin(true);          // format on first boot
   bool restored = loadTrack();
 
-  FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS)
+  // MAX_LEDS, not `P.numLeds`: FastLED controllers can be added but not
+  // removed or resized, so binding the live length here would make `set leds`
+  // a reboot rather than a knob. The whole buffer is clocked out and the tail
+  // is held black by the render loop instead.
+  FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, MAX_LEDS)
          .setCorrection(TypicalLEDStrip);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS);
+  // From P, not from the define: `loadParams()` has already run, so a saved cap
+  // must win here the same way a saved brightness does.
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, P.maxMA);
   FastLED.setBrightness(P.brightness);
   buildGamma();
   random16_set_seed((uint16_t)esp_random());
@@ -879,7 +988,13 @@ void setup() {
   } else {
     Serial.println(F("ready, no stored track"));
   }
-  Serial.print  (F("pixels   : ")); Serial.println(NUM_LEDS);
+  Serial.print  (F("pixels   : ")); Serial.print(P.numLeds);
+  Serial.print  (F(" of ")); Serial.print(MAX_LEDS);
+  Serial.print  (F(" max = ")); Serial.print(P.numLeds / 144.0f * 39.37f, 1);
+  Serial.print  (F("\" (")); Serial.print(P.numLeds / 144.0f, 2);
+  Serial.println(F(" m at 144/m) — `len <inches>` or `set leds <n>`"));
+  Serial.print  (F("LED cap  : ")); Serial.print(P.maxMA);
+  Serial.println(F(" mA at 5 V — `pwr` for the estimate against a meter"));
   Serial.print  (F("my MAC   : ")); Serial.println(WiFi.macAddress());
   Serial.print  (F("link     : "));
   Serial.println(linkUp ? F("ESP-NOW up, ch 1") : F("DOWN — serial only"));
@@ -915,6 +1030,8 @@ static void showParams() {
   Serial.print(F("flareGap      ")); Serial.println(P.flareGap, 3);
   Serial.print(F("gamma         ")); Serial.println(P.gamma, 2);
   Serial.print(F("brightness    ")); Serial.println(P.brightness);
+  Serial.print(F("maxMA         ")); Serial.println(P.maxMA);
+  Serial.print(F("leds          ")); Serial.println(P.numLeds);
   Serial.print(F("env (live)    ")); Serial.println(env, 3);
 }
 
@@ -948,8 +1065,62 @@ static bool setParam(const String& k, float v) {
   else if (k == "gamma")      { P.gamma = v; buildGamma(); }
   else if (k == "brightness") { P.brightness = (uint8_t)v;
                                 FastLED.setBrightness(P.brightness); }
+  else if (k == "maxMA" || k == "mA") {
+                                P.maxMA = (uint16_t)v;
+                                FastLED.setMaxPowerInVoltsAndMilliamps(5, P.maxMA); }
+  // Clamped rather than rejected: the useful failure is asking for more strip
+  // than this build can drive and getting the most it can, with `show`/`st`
+  // saying what you actually got. Zero would divide by zero in the ends check
+  // and render nothing, so the floor is 1.
+  else if (k == "leds" || k == "numLeds") {
+                                if (v < 1) v = 1;
+                                if (v > MAX_LEDS) v = MAX_LEDS;
+                                P.numLeds = (uint16_t)v; }
   else return false;
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// WHAT IT IS ACTUALLY DRAWING — estimated, and reported so that a meter has
+// something to disagree with.
+//
+// At 50 pixels this question never arose: the frame never came near the cap, so
+// the limiter was inert and `brightness` was the whole story. At 144 the cap is
+// close enough to the truth that "is the limiter dimming me?" is a question
+// about the LOOK and not only about the battery, and it cannot be answered by
+// reading the source — it depends on the frame on the strip right now.
+//
+// Three numbers, because two of them are routinely confused:
+//
+//   wantMA   what this frame would draw at `brightness`, uncapped
+//   capMA    the ceiling in force
+//   estMA    what FastLED will actually let it draw
+//
+// estMA < wantMA means the limiter is holding the frame down. FastLED's own
+// model is used rather than a constant per pixel, so the estimate tracks the
+// fire instead of assuming white — but it is a MODEL: it counts the LEDs only,
+// at an assumed 5.0 V, and excludes the ~40-50 mA the XIAO itself takes. A
+// meter on the supply should read somewhat ABOVE estMA. A meter reading far
+// below it is the colour correction, which the model does not account for — so
+// the estimate errs HIGH, which is the safe direction for a cap. A meter far
+// above it means the model's assumptions are wrong, and the meter wins.
+// ---------------------------------------------------------------------------
+// Outputs by reference rather than a returned struct: the .ino preprocessor
+// generates prototypes ahead of every file-scope type, so a function returning
+// one declared here does not compile.
+static void estimatePower(uint32_t& wantMA, uint32_t& estMA, uint8_t& allowed) {
+  // MAX_LEDS and not `P.numLeds`, because the whole buffer is what gets
+  // clocked out — and it costs nothing to be right about it: the tail is black
+  // every frame, and black pixels contribute only their quiescent draw to
+  // FastLED's model. A shortened bar therefore reports a proportionally
+  // smaller number here without any arithmetic of ours.
+  uint32_t unscaled = calculate_unscaled_power_mW(leds, MAX_LEDS);
+  allowed = calculate_max_brightness_for_power_vmA(
+              leds, MAX_LEDS, P.brightness, 5, P.maxMA);
+  // mW at 5 V -> mA, after the brightness scale each case implies. 144 white
+  // pixels is ~43 W, so 43000 * 255 still sits well inside a uint32.
+  wantMA = (unscaled * P.brightness) / 255 / 5;
+  estMA  = (unscaled * allowed)      / 255 / 5;
 }
 
 static void handleLine(String line) {
@@ -969,12 +1140,26 @@ static void handleLine(String line) {
   // always the compiled defaults, not what you just set. Over the radio the bar
   // is never interrupted, so `st` is the only honest way to ask it anything.
   if (verb == "st") {
+    uint32_t pwrWant, pwrEst; uint8_t pwrAllowed;
+    estimatePower(pwrWant, pwrEst, pwrAllowed);
     String out = "st amb=" + String(usingLamp ? "lamp"
                                              : AMBIENCES[ambIndex].name)
                + " motion=" + String(MOTION_NAMES[P.motion])
                + " hue=" + String(P.lampHue)
                + " y=" + String(P.yellow, 2)
                + " br=" + String(P.brightness)
+               // The draw, because at 144 pixels it is state and not trivia.
+               // Two tokens rather than a flagged one: the box parses `st` by
+               // splitting on `=`, so `mA=1487!` would hand it a number that
+               // is not one. `capped=1` says the current cap — not `br` — set
+               // the level of the frame being looked at; `pwr` breaks it down.
+               + " mA=" + String(pwrEst)
+               + (pwrAllowed < P.brightness ? " capped=1" : "")
+               // The bar's LENGTH, which is now a setting and so is now state.
+               // `leds=` and not `px=`: `px=` already means the middle pixel's
+               // colour six tokens down, and one key meaning two things in one
+               // line is how a parser that splits on `=` gets quietly wrong.
+               + " leds=" + String(P.numLeds)
                + " breath=" + String(P.breathHz, 2)
                + " rel=" + String(P.release, 3)
                + " gain=" + String(P.speechGain, 2)
@@ -995,9 +1180,9 @@ static void handleLine(String line) {
                // afternoon was spent arguing about the difference. If mix moves
                // and this does not, the fault is between the maths and the
                // strip — not in the track, the envelope or the parameters.
-               + " px=" + String(leds[NUM_LEDS / 2].r) + ","
-                        + String(leds[NUM_LEDS / 2].g) + ","
-                        + String(leds[NUM_LEDS / 2].b)
+               + " px=" + String(leds[P.numLeds / 2].r) + ","
+                        + String(leds[P.numLeds / 2].g) + ","
+                        + String(leds[P.numLeds / 2].b)
                + " heat=" + String(lastHeatMid, 2)
                + " trk=" + String(trackFrames)
                // The CLIP, not just the count. The box verifies what the
@@ -1008,6 +1193,54 @@ static void handleLine(String line) {
                // cue would be refused with nothing having warned anyone.
                + " clip=" + String(trackClip)
                + (playing ? " playing@" + String(trackPosMs()) : " idle");
+    Serial.println(out);
+    linkSend(out);
+    return;
+  }
+
+  // Answers over the radio, and for exactly the reason `st` does: the board is
+  // never interrupted that way, so this reports the frame that is on the strip
+  // rather than the first frame after a reboot.
+  if (verb == "pwr") {
+    uint32_t wantMA, estMA; uint8_t allowed;
+    estimatePower(wantMA, estMA, allowed);
+    String out = "pwr leds=" + String(P.numLeds)
+               + " br=" + String(P.brightness)
+               + " allowed=" + String(allowed)
+               + " wantMA=" + String(wantMA)
+               + " capMA=" + String(P.maxMA)
+               + " estMA=" + String(estMA)
+               + (allowed < P.brightness ? " LIMITING" : " headroom")
+               + " (+~45mA XIAO, not counted)";
+    Serial.println(out);
+    linkSend(out);
+    return;
+  }
+
+  // Length in INCHES, because that is the unit the bar is cut and mounted in
+  // and 144 LED/m is not a number anyone should have to divide by. It sets the
+  // same value `set leds` does — this is a convenience, not a second source of
+  // truth — and it answers with both, so the conversion is never a guess.
+  if (verb == "len") {
+    if (rest.length()) {
+      float inches = rest.toFloat();
+      // 144 LED/m over 39.37 in/m = 3.6576 pixels per inch.
+      float px = inches * 144.0f / 39.37f;
+      setParam("leds", px);            // clamps, and owns the rule
+    }
+    String out = "len " + String(P.numLeds / 144.0f * 39.37f, 1) + "in leds="
+               + String(P.numLeds) + " max=" + String(MAX_LEDS);
+    Serial.println(out);
+    linkSend(out);
+    return;
+  }
+
+  // Does the length match the strip? Nothing else in the firmware can tell.
+  if (verb == "ends") {
+    endsUntilMs = millis() + ENDS_MS;
+    String out = "ends 0 and " + String(P.numLeds - 1) + " lit for "
+               + String(ENDS_MS / 1000) + "s — the far marker should be the "
+                 "last pixel of the bar";
     Serial.println(out);
     linkSend(out);
     return;
@@ -1039,6 +1272,7 @@ static void handleLine(String line) {
   if (verb == "help") {
     Serial.println(F("show                 every live parameter (serial only)"));
     Serial.println(F("st                   one-line state, answers over the radio"));
+    Serial.println(F("pwr                  estimated draw vs the cap, over the radio"));
     Serial.println(F("set <key> <value>    change one (see show for keys)"));
     Serial.println(F("amb <fire|water|storm|lamp>"));
     Serial.println(F("lamp <hue> [sat]     a plain colour, and select it"));
@@ -1047,6 +1281,10 @@ static void handleLine(String line) {
     Serial.println(F("env <0..1>           hold excitation; 'idle' releases"));
     Serial.println(F("set yellow 0.8       redder | 1.3 more yellow"));
     Serial.println(F("set brightness 70    less light reads as MORE saturated"));
+    Serial.println(F("set maxMA 1500       LED current cap; 1700 is the supply's limit"));
+    Serial.println(F("set leds <n>         how many pixels the bar actually is"));
+    Serial.println(F("len [inches]         the same, in inches; no arg just asks"));
+    Serial.println(F("ends                 light pixel 0 and the last one, 15s"));
     Serial.println(F("idle                 release the hold, stop speaking"));
     Serial.println(F("flare                fire one crackle now"));
     Serial.println(F("trk begin|d|end      load an envelope track"));
@@ -1403,7 +1641,19 @@ void loop() {
   float spaceScale = P.spaceScale * (1.0f - P.speechSpread * 0.5f * env);
 
   // Layers 3 — advance the crackles.
-  float flareField[NUM_LEDS] = {0};
+  //
+  // The pixel loops below index with uint16_t, not uint8_t. 144 still fits in a
+  // byte so this build works either way, but `i < P.numLeds` with a uint8_t `i`
+  // does not merely truncate at 256 — it never terminates, and it would do that
+  // the first time someone added a second metre of strip. Cheap insurance
+  // against a change that otherwise looks like a one-line edit.
+  //
+  // MAX_LEDS floats is 576 B of stack per frame at 144, which the Arduino loop
+  // task's 8 K absorbs; a MAX_LEDS several times larger should move this to a
+  // static buffer like `heat` already is. Sized by the ceiling rather than by
+  // `numLeds` because a variable-length array would re-cost this every frame
+  // and buy nothing — the loops below stop at `numLeds` regardless.
+  float flareField[MAX_LEDS] = {0};
   for (uint8_t f = 0; f < MAX_FLARES; f++) {
     if (!flares[f].live) continue;
     flares[f].age += dt;
@@ -1416,7 +1666,7 @@ void loop() {
     }
     float a = flares[f].amp * e;
     float inv2s2 = 1.0f / (2.0f * P.flareWidth * P.flareWidth);
-    for (uint8_t i = 0; i < NUM_LEDS; i++) {
+    for (uint16_t i = 0; i < P.numLeds; i++) {
       float d = i - flares[f].pos;
       flareField[i] += a * expf(-(d * d) * inv2s2);
     }
@@ -1438,7 +1688,7 @@ void loop() {
   if (blinkPhase >= 1.0f) blinkPhase -= (float)(int)blinkPhase;
 
   uint16_t tz = (uint16_t)noisePhase;
-  for (uint8_t i = 0; i < NUM_LEDS; i++) {
+  for (uint16_t i = 0; i < P.numLeds; i++) {
     // `motion` decides what feeds heat; everything after this is unchanged, so
     // a lamp goes through the same palette, the same speech excitation, the same
     // word colour and the same blackout as a fire does. That is the point of
@@ -1468,10 +1718,10 @@ void loop() {
     float floorHere = (P.motion == MOTION_AMBIENT) ? P.emberFloor : 0.0f;
     heat[i] = h < floorHere ? floorHere : (h > 1.0f ? 1.0f : h);
   }
-  lastHeatMid = heat[NUM_LEDS / 2];
+  lastHeatMid = heat[P.numLeds / 2];
 
   // Colour is a function of heat and nothing else, then gamma last.
-  for (uint8_t i = 0; i < NUM_LEDS; i++) {
+  for (uint16_t i = 0; i < P.numLeds; i++) {
     // LINEARBLEND_NOWRAP, and the difference is not cosmetic.
     //
     // Plain LINEARBLEND treats a 16-entry palette as a RING: at index 255 it
@@ -1517,5 +1767,29 @@ void loop() {
     }
     leds[i] = CRGB(gammaLUT[c.r], gammaLUT[c.g], gammaLUT[c.b]);
   }
+
+  // The tail beyond the bar's length, held black EVERY frame rather than once
+  // when `numLeds` changes. FastLED clocks the whole buffer whatever we do, so
+  // a tail written once and then left alone would freeze the last image on it —
+  // which on a strip physically longer than `numLeds` is a stripe of dead fire
+  // past the end of the bar, and on a shorter one is invisible and therefore
+  // never debugged. Doing it here costs a memset of at most MAX_LEDS pixels.
+  for (uint16_t i = P.numLeds; i < MAX_LEDS; i++) leds[i] = CRGB::Black;
+
+  // `ends` overrides everything above, and does so AFTER the frame is built so
+  // it cannot be defeated by an ambience, a lamp, a blackout or a track. Two
+  // pixels, deliberately dim and different colours: the question is *where the
+  // far one is*, and a bright white marker on a diffuser blooms enough to move
+  // the answer by an inch.
+  if (endsUntilMs) {
+    if ((int32_t)(millis() - endsUntilMs) >= 0) {
+      endsUntilMs = 0;                 // spell over; the next frame is normal
+    } else {
+      for (uint16_t i = 0; i < MAX_LEDS; i++) leds[i] = CRGB::Black;
+      leds[0] = CRGB(60, 30, 0);                    // amber: the near end
+      leds[P.numLeds - 1] = CRGB(0, 20, 60);        // blue:  the far end
+    }
+  }
+
   FastLED.show();
 }
