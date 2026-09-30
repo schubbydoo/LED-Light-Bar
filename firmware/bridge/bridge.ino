@@ -77,6 +77,10 @@ static bool linkSend(const String& s) {
 }
 
 void setup() {
+  // 80 MHz, not the default 160. This board only shuttles text between serial
+  // and the radio; it was running warm for no benefit. The radio is unaffected
+  // (TX power and channel are untouched), so link range does not change.
+  setCpuFrequencyMhz(80);
   Serial.begin(115200);
   // NEVER BLOCK ON A PORT NOBODY IS READING.
   //
@@ -170,4 +174,8 @@ void loop() {
     }
     buf = "";
   }
+  // Yield between polls. Without this loop() spins flat out: the Arduino core's
+  // loop task outranks the idle task, so the CPU never idles and the board runs
+  // warm around the clock. 1 ms costs nothing against the 60 ms per-line wait.
+  delay(1);
 }
