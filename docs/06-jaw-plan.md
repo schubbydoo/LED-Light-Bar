@@ -99,9 +99,11 @@ wire are identical. What changes is addressing and bookkeeping:
    verb.
 3. **`lead_ms` per channel**, not global. A servo's latency is not a light's.
 
-**The bridge changes too, and it is in this repo.** It forwards every line to one hard-coded
+**The bridge changes too, and it is in this repo.** It forwarded every line to one hard-coded
 peer (`PEER_BAR`). For two props it needs a small peer table and a line prefix — `@jaw cue ...`
-— with the **default staying the bar, so nothing that works today changes**.
+— with the **default staying the bar, so nothing that works today changes.**
+*Status 2026-11-12: written and tested on a PC against a fake radio; **not yet flashed to a real
+bridge**. See "More than one prop on the bridge" in `firmware/README.md`.*
 
 ### Two props talking at once
 

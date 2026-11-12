@@ -9,7 +9,7 @@ Two sketches, two ends of one radio link, versioned together — see the note in
 | `bringup/` | Five staged hardware questions, with the strip attached. |
 | `pixelcheck/` | Whole-strip primaries and fixed markers, held. For when `bringup` raises a question about one pixel or one channel — it removes motion from the answer. |
 | `bar/` | The light bar — the ambience renderer. **Tunable live over serial.** |
-| `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW. **Working.** |
+| `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW, to one or more props. **Working for the bar; multi-prop addressing written 2026-11-12, not yet flashed.** |
 
 ---
 
@@ -40,6 +40,56 @@ esptool --port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_<MAC>-
 
 Both addresses appear in exactly one place each in `flash.sh` and `monitor.sh`.
 Swap a board, change them there.
+
+---
+
+## More than one prop on the bridge
+
+*Written 2026-11-12, for the planned jaw prop (`docs/06-jaw-plan.md`). **Tested on a PC against a
+fake radio; not yet flashed to a real bridge.** The first flash is the real test.*
+
+A line is for the light bar unless it says otherwise. Nothing that worked before changes:
+
+```
+./send.sh bridge "amb water"        # the bar — exactly as before
+./send.sh bridge "@bar amb water"   # the bar, said explicitly
+./send.sh bridge "@jaw st"          # the jaw prop
+```
+
+The `@name` is stripped before the line goes out, so every prop understands the same commands.
+Replies are tagged by who sent them: the bar's stay exactly as they were (`bar> ...`, `-> ok`),
+and any other prop is named (`jaw> ...`, `-> ok @jaw`).
+
+The prop table is `PEERS[]` near the top of `bridge/bridge.ino`, and **the jaw's MAC is not set**
+until its board exists — a line to it is refused with a clear message rather than sent at nobody.
+When the board arrives, put its MAC there, in `flash.sh` and in `send.sh`, and nowhere else.
+
+**Bridge commands** (typed at the bridge, never forwarded): `.stats` delivery counts per prop ·
+`.peers` the table · `.mac` · `.gap` shows the pacing, `.gap 30` sets it.
+
+**Pacing.** The bridge no longer sleeps after each line, which used to stall everything — a cue
+for one prop waited behind a position update for another. Each prop now has its own gap, and a
+line for one can go out while another is inside its gap. **The gap itself is unchanged at 60 ms**,
+because that is what the bar was proven against and nobody has measured less. Two reasons it is
+there: the bar holds one received line and drops anything that arrives before it has taken it, and
+ESP-NOW loses *both* packets if a second is queued before the first completes. `trk` lines always
+keep 60 ms, even if `.gap` is lowered. To go faster, measure: set `.gap 30`, push a track, and
+check that `trk ok` still comes back.
+
+**Two behaviour changes worth knowing.** A line longer than 240 characters is now *refused*
+rather than clipped (the old bridge sent the stump, which silently corrupted a track chunk). And
+the `-> ok` reply is printed when the radio reports back, a few milliseconds after the line, not
+before the bridge moves on.
+
+**Tests that need no board:**
+
+```bash
+./bridge/test/run.sh
+```
+
+It runs the routing and pacing rules in isolation, then the real `bridge.ino` against a fake radio.
+It proves the logic. It does **not** prove the sketch compiles on the real ESP32 core — only
+`./flash.sh bridge bridge` does, so do that before flashing anything to the box.
 
 ---
 
