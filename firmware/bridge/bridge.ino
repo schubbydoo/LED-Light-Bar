@@ -88,7 +88,7 @@ struct Peer {
 
 static Peer PEERS[] = {
   { "bar", {0xF0, 0x9E, 0x9E, 0xB2, 0xA8, 0x28} },   // the light bar
-  { "jaw", {0x00, 0x00, 0x00, 0x00, 0x00, 0x00} },   // NOT SET — fill in when the board arrives
+  { "jaw", {0x44, 0xB1, 0x76, 0x5F, 0xB4, 0x28} },   // the servo jaw
 };
 static const int N_PEERS = sizeof(PEERS) / sizeof(PEERS[0]);
 static_assert(sizeof(PEERS) / sizeof(PEERS[0]) <= bridge::MAX_PEERS, "raise MAX_PEERS");

@@ -51,6 +51,9 @@ static void fresh() {                          // quiet the bridge between scena
 static bool toMac(const SentPacket& p, int peer) { return memcmp(p.mac, PEERS[peer].mac, 6) == 0; }
 
 static void scenario_boot() {
+  // The shipped table now has the jaw's real MAC. These scenarios start from an
+  // UNSET prop, to keep covering the refusal path, so blank it before boot.
+  memset(PEERS[1].mac, 0, 6);
   setup();
   CHECK(has("jaw  (MAC not set)"));
   CHECK(has("* bar  F0:9E:9E:B2:A8:28"));

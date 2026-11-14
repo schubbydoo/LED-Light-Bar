@@ -26,6 +26,7 @@ PY="${SFX_ESPTOOL_PY:-\$HOME/esptool-venv/bin/python}"
 
 MAC_BAR="F0:9E:9E:B2:A8:28"
 MAC_BRIDGE="F0:9E:9E:B2:3D:38"
+MAC_JAW="44:B1:76:5F:B4:28"
 
 target="${1:-}"
 shift || true
@@ -33,7 +34,8 @@ shift || true
 case "$target" in
     bar)    mac="$MAC_BAR" ;;
     bridge) mac="$MAC_BRIDGE" ;;
-    *)      echo "usage: ./send.sh {bar|bridge} <command>" >&2; exit 2 ;;
+    jaw)    mac="$MAC_JAW" ;;
+    *)      echo "usage: ./send.sh {bar|bridge|jaw} <command>" >&2; exit 2 ;;
 esac
 [[ $# -gt 0 ]] || { echo "nothing to send" >&2; exit 2; }
 port="/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_${mac}-if00"
