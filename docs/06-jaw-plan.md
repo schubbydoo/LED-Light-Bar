@@ -275,3 +275,28 @@ cover several stalls (one S51 stalled at 459 mA).
 Order: channels in firmware → Manual positions → Move on its own → the box's Servo tab panels and
 two show steps (go to position, move on its own on/off). The wire command format is agreed with the
 box's agent before firmware is written.
+
+### Wire format, agreed with the box's agent 2026-11-14
+
+Un-prefixed commands and the `st` / `show` replies for channel 1 stay exactly as they are, so
+the box keeps working until it is updated. Names and labels live on the box; the wire carries
+channel and slot NUMBERS only.
+
+| Command | Meaning |
+|---|---|
+| `set <ch>.<param> <v>` | a parameter on channel N; un-prefixed `set` = channel 1 |
+| `mode <ch> speech\|manual` | firmware state, saved with `save` |
+| `slot <ch> <n> <deg> <speed>` | define position slot n (angle, travel speed) |
+| `go <ch> <n>` | go to slot n, eased at its speed → `ok go <ch> <n>`; `refused ...` on a speech channel |
+| `auto <ch> on\|off` | Move on its own → `ok auto ...`; `refused ...` on a speech channel |
+| `stop` | also ends every channel's `auto` |
+
+- A cue/track drives only speech channels.
+- **Dead-man:** `auto on` expires after 120 s unless repeated (the box re-sends every 60 s while
+  a show is open). `auto` state is RAM-only and off at boot. A crashed or unpowered box therefore
+  cannot leave a servo blinking.
+- `st`: the existing `st dev=jaw ... channels=N` header line first, then one `st ch=N` line per
+  channel (mode, pos = slot or `between`, auto on/off, attached).
+- `show`: one `show ch=N closedDeg=...` line per channel, and `slots ch=N 1=<deg>/<speed> ...`
+  lines. Each under one radio frame.
+- The name `pos` stays the track-clock correction; there is no `pos2`.
