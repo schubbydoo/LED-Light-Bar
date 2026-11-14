@@ -375,5 +375,8 @@ Calibrate with the jaw mounted: `hold <deg>`, `open`, `close`, widening `loDeg`/
 degrees at a time while watching a power meter. A servo driven into a stop draws its stall
 current (459 mA measured, `docs/07-servo-s51.md`) until told to move.
 
-**Untested:** the jaw against a real mechanism, anything over the radio, and a real track.
-The defaults are starting points for tuning by eye.
+**Tested 2026-11-14, on the bench with a servo and a free lever:** commands, limits and persistence over
+serial; then, through the box's Jaw tab, a track pushed over the radio and cued from the player's
+real position, with two different sounds. It **looked** synchronized to the user. **Sync has not
+been measured** the way the bar's was (±55 ms), and no real jaw has been tried, so the swing,
+attack, release and slew defaults are still starting points for tuning by eye.

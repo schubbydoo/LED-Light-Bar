@@ -1,6 +1,10 @@
 # Speech-driven jaw — plan
 
-Date: 2026-11-12 · **Status: PLAN. Nothing here is built or measured.**
+Date: 2026-11-12 · **Status 2026-11-14: phases 1–4 done on the bench, phase 5 started.** The bench
+servo is measured (`docs/07-servo-s51.md`), `firmware/jaw/` runs, and two different sounds were
+pushed over the radio and cued from the box, with the jaw judged by eye to move in time. Not yet
+done: a real jaw mechanism, sync measured as the bar's was, the bar and jaw speaking at once, and
+`firmware/common/`. The sections below are the plan as first written.
 
 A second renderer for the same link: a servo jaw on an animatronic, driven by the same speech
 track the light bar uses. This document is the plan and the reasons for it. Where it says
