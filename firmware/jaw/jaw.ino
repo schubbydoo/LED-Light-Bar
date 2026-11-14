@@ -55,7 +55,30 @@
     Widen loDeg / hiDeg a few degrees at a time, watching a power meter. A servo
     driven past a mechanical stop draws its stall current until told to move.
 
-  Pin: D10 (GPIO10). Never D0, D8 or D9 — see CLAUDE.md, strapping pins.
+  ---------------------------------------------------------------------------
+  SEVERAL SERVOS ON ONE BOARD (docs/06-jaw-plan.md §10)
+
+  One board is one prop; each servo is a CHANNEL (1..4, `channels <n>`, default 1).
+  Channel 1 is on D10, 2..4 on D1, D2, D3 (GPIO3/4/5 — never D0, D8, D9). Every
+  command without a channel means channel 1, and the single-servo replies are
+  unchanged, so a box that knows only one servo keeps working.
+
+  A channel's MODE is firmware state:  mode <ch> speech|manual
+    speech  follows the box's track exactly as the single jaw always did
+    manual  goes to a named POSITION SLOT on `go <ch> <slot>`, eased at the slot's
+            speed; optionally `auto <ch> on` repeats slot autoA <-> autoB by itself.
+  Names and labels live on the box; the wire carries channel and slot NUMBERS only.
+
+    set <ch>.<key> <v>          one parameter on a channel (no prefix = channel 1)
+    slot <ch> <n> <deg> <speed> define slot n (1..8): angle and travel deg/s
+    go <ch> <n>                 go to slot n; ends that channel's `auto`
+    auto <ch> on|off            repeat autoA<->autoB (autoGapS, autoJitter, autoHoldS)
+    stop | stop all             release the track | ALSO end every channel's `auto`
+
+  `auto on` is a DEAD-MAN: it expires after 120 s unless repeated. It is RAM-only
+  and off at boot, so a box that crashes mid-show cannot leave a servo moving.
+
+  Pins: D10 (GPIO10), D1..D3. Never D0, D8 or D9 — see CLAUDE.md, strapping pins.
 */
 
 #include <Preferences.h>
@@ -63,8 +86,16 @@
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
+#include <stddef.h>
 
-static const int      SERVO_PIN = D10;
+// Declared up front: the Arduino build inserts function prototypes above the
+// struct definitions, and several of them take a Chan or a Knob.
+struct Chan;
+struct Knob;
+
+static const int      MAX_CH    = 4;
+static const int      MAX_SLOTS = 8;
+static const int      CH_PINS[MAX_CH] = {D10, D1, D2, D3};     // GPIO10, 3, 4, 5
 static const uint32_t PWM_HZ    = 50;
 static const uint8_t  PWM_BITS  = 14;                      // 16384 counts per 20 ms
 static const uint32_t PERIOD_US = 1000000UL / PWM_HZ;
@@ -75,6 +106,8 @@ static const float US_MIN = 500.0f, US_MAX = 2500.0f;
 
 static const uint8_t  FPS      = 50;                       // the servo's frame rate AND the track's
 static const uint32_t FRAME_US = 1000000UL / FPS;
+
+static const uint32_t AUTO_DEADMAN_MS = 120000;            // `auto on` lapses unless repeated
 
 // ---------------------------------------------------------------------------
 // The link — copied from bar.ino, which is the reference. Text lines over
@@ -88,13 +121,44 @@ static void handleLine(String line);
 
 // One reply per received line: ESP-NOW sends are asynchronous, and a second
 // queued before the first completes loses BOTH. See bar.ino.
+//
+// `st` and `show` now answer with several lines (a header, then one per channel).
+// They go through a small queue that sends the next only after the previous send
+// has COMPLETED, so the one-in-flight rule still holds.
 static bool linkReplied = false;
 static void linkQuiet() { linkReplied = true; }
 
+static const int TXQ = 10;
+static String   txq[TXQ];
+static int      txHead = 0, txCount = 0;
+static volatile bool txBusy = false;
+static uint32_t txAt = 0;
+static const uint32_t TX_GAP_MS = 25;
+
 static void linkSend(const String& s) {
   if (!linkUp) return;
-  esp_now_send(PEER_BRIDGE, (const uint8_t*)s.c_str(), s.length());
   linkReplied = true;
+  if (txCount >= TXQ) return;                              // drop, never block
+  txq[(txHead + txCount) % TXQ] = s;
+  txCount++;
+}
+
+static void onSent(const esp_now_send_info_t* info, esp_now_send_status_t status) {
+  txBusy = false;
+}
+
+static void pumpTx() {
+  if (!txCount) return;
+  uint32_t now = millis();
+  if (txBusy && now - txAt > 150) txBusy = false;          // a callback that never came
+  if (txBusy || now - txAt < TX_GAP_MS) return;
+  String& s = txq[txHead];
+  txBusy = true;
+  txAt = now;
+  esp_now_send(PEER_BRIDGE, (const uint8_t*)s.c_str(), s.length());
+  s = "";
+  txHead = (txHead + 1) % TXQ;
+  txCount--;
 }
 
 static volatile bool  rxPending = false;
@@ -119,6 +183,7 @@ static void linkBegin() {
     return;
   }
   esp_now_register_recv_cb(onRecv);
+  esp_now_register_send_cb(onSent);
   esp_now_peer_info_t peer = {};
   memcpy(peer.peer_addr, PEER_BRIDGE, 6);
   peer.channel = LINK_CHANNEL;
@@ -131,8 +196,13 @@ static void linkBegin() {
 }
 
 // ---------------------------------------------------------------------------
-// Parameters. All floats, one blob, with a version AND a size — see bar.ino for
-// why. A table drives `show`, `set` and `get`, so adding a knob is one line.
+// Parameters. All floats, so a table drives `show`, `set` and `get` and adding a
+// knob is one line. Two structs per channel, stored separately on purpose:
+//
+//   Params  the original single-servo knobs. Channel 1's blob keeps the SAME NVS
+//           key, version and size it always had, so a board already tuned keeps
+//           its settings across this firmware.
+//   Extra   what several servos added: mode, the auto-move settings, the slots.
 // ---------------------------------------------------------------------------
 struct Params {
   float closedDeg   = 90.0f;
@@ -149,36 +219,87 @@ struct Params {
   float lookaheadMs = 0.0f;
   float idleDetachS = 0.0f;
 };
-static Params P;
-static Params DEFAULTS;
 
-struct Knob { const char* name; float* p; float lo, hi; };
-static Knob KNOBS[] = {
-  {"closedDeg",   &P.closedDeg,   0.0f,  180.0f},
-  {"swingDeg",    &P.swingDeg,    0.0f,   90.0f},
-  {"dir",         &P.dir,        -1.0f,    1.0f},
-  {"loDeg",       &P.loDeg,       0.0f,  180.0f},
-  {"hiDeg",       &P.hiDeg,       0.0f,  180.0f},
-  {"gain",        &P.gain,        0.0f,    2.0f},
-  {"deadband",    &P.deadband,    0.0f,    0.9f},
-  {"curve",       &P.curve,       0.3f,    3.0f},
-  {"attack",      &P.attack,      0.01f,   1.0f},
-  {"release",     &P.release,     0.01f,   1.0f},
-  {"slewDegS",    &P.slewDegS,   30.0f,  1000.0f},
-  {"lookaheadMs", &P.lookaheadMs, 0.0f,  300.0f},
-  {"idleDetachS", &P.idleDetachS, 0.0f,  600.0f},
+struct Extra {
+  float mode        = 0.0f;       // 0 speech, 1 manual — set with `mode`, not `set`
+  float autoA       = 1.0f;       // slot the auto-move rests at
+  float autoB       = 2.0f;       // slot it visits (a blink's "closed")
+  float autoGapS    = 4.0f;       // average rest between visits
+  float autoJitter  = 0.5f;       // 0..1, +/- fraction of the gap
+  float autoHoldS   = 0.15f;      // time spent at B before returning
+  float slotDeg[MAX_SLOTS];       // < 0: not defined
+  float slotSpeed[MAX_SLOTS];     // deg/s
+  Extra() { for (int i = 0; i < MAX_SLOTS; i++) { slotDeg[i] = -1.0f; slotSpeed[i] = 200.0f; } }
+};
+
+struct Chan {
+  Params p;
+  Extra  x;
+  // runtime
+  float    env = 0.0f;            // smoothed level, 0..1 (speech)
+  float    holdDeg = -1.0f;       // >=0: pinned at an angle (`hold`, `open`, `close`)
+  float    manualTarget = -1.0f;  // >=0: where a manual channel is going
+  float    moveSpeed = 200.0f;    // deg/s toward manualTarget
+  int      curSlot = 0;           // last slot commanded, 0 = none yet
+  float    angle = 90.0f;         // what is being commanded now, after slew
+  bool     attached = false;
+  bool     limited = false;
+  uint32_t restSince = 0;
+  bool     autoOn = false;
+  uint32_t autoUntil = 0, autoNext = 0, phaseStart = 0, holdStart = 0;
+  uint8_t  autoPhase = 0;         // 0 resting at A, 1 going to / holding at B, 2 returning
+};
+
+static Chan C[MAX_CH];
+static Chan DEF[MAX_CH];            // compiled defaults, for `forget`
+static int  nch = 1;                // channels in use
+
+struct Knob { const char* name; uint8_t which; uint16_t off; float lo, hi; };
+#define PK(n, lo, hi) {#n, 0, (uint16_t)offsetof(Params, n), lo, hi}
+#define XK(n, lo, hi) {#n, 1, (uint16_t)offsetof(Extra, n), lo, hi}
+static const Knob KNOBS[] = {
+  PK(closedDeg,   0.0f,  180.0f),
+  PK(swingDeg,    0.0f,   90.0f),
+  PK(dir,        -1.0f,    1.0f),
+  PK(loDeg,       0.0f,  180.0f),
+  PK(hiDeg,       0.0f,  180.0f),
+  PK(gain,        0.0f,    2.0f),
+  PK(deadband,    0.0f,    0.9f),
+  PK(curve,       0.3f,    3.0f),
+  PK(attack,      0.01f,   1.0f),
+  PK(release,     0.01f,   1.0f),
+  PK(slewDegS,   30.0f,  1000.0f),
+  PK(lookaheadMs, 0.0f,  300.0f),
+  PK(idleDetachS, 0.0f,  600.0f),
+  XK(autoA,       1.0f,    (float)MAX_SLOTS),
+  XK(autoB,       1.0f,    (float)MAX_SLOTS),
+  XK(autoGapS,    0.5f,  120.0f),
+  XK(autoJitter,  0.0f,    1.0f),
+  XK(autoHoldS,   0.0f,   10.0f),
 };
 static const int N_KNOBS = sizeof(KNOBS) / sizeof(KNOBS[0]);
+static const int N_PARAM_KNOBS = 13;       // the first 13 are Params; the rest are Extra
+
+static float* knobPtr(Chan& c, const Knob& k) {
+  return (float*)((char*)(k.which ? (void*)&c.x : (void*)&c.p) + k.off);
+}
 
 static Preferences prefs;
 static const char*    NVS_NS         = "jaw";
 static const uint16_t PARAMS_VERSION = 1;
+static const uint16_t EXTRA_VERSION  = 1;
 
 static void saveParams() {
   prefs.begin(NVS_NS, false);
   prefs.putUShort("pver", PARAMS_VERSION);
   prefs.putUShort("psize", (uint16_t)sizeof(Params));
-  prefs.putBytes("params", &P, sizeof(Params));
+  prefs.putBytes("params", &C[0].p, sizeof(Params));            // channel 1: unchanged key
+  prefs.putUShort("xver", EXTRA_VERSION);
+  prefs.putUShort("nch", (uint16_t)nch);
+  for (int i = 0; i < MAX_CH; i++) {
+    if (i > 0) prefs.putBytes((String("p") + (i + 1)).c_str(), &C[i].p, sizeof(Params));
+    prefs.putBytes((String("x") + (i + 1)).c_str(), &C[i].x, sizeof(Extra));
+  }
   prefs.end();
 }
 
@@ -188,10 +309,19 @@ static void loadParams() {
   uint16_t size = prefs.getUShort("psize", 0);
   if (ver == PARAMS_VERSION && size == sizeof(Params)) {
     Params tmp;
-    if (prefs.getBytes("params", &tmp, sizeof(tmp)) == sizeof(tmp)) P = tmp;
+    if (prefs.getBytes("params", &tmp, sizeof(tmp)) == sizeof(tmp)) C[0].p = tmp;
   } else if (ver) {
     Serial.printf("params: stored v%u/%uB ignored (this build wants v%u/%uB)\n",
                   ver, size, PARAMS_VERSION, (unsigned)sizeof(Params));
+  }
+  if (prefs.getUShort("xver", 0) == EXTRA_VERSION) {
+    int n = prefs.getUShort("nch", 1);
+    if (n >= 1 && n <= MAX_CH) nch = n;
+    for (int i = 0; i < MAX_CH; i++) {
+      Params p; Extra x;
+      if (i > 0 && prefs.getBytes((String("p") + (i + 1)).c_str(), &p, sizeof(p)) == sizeof(p)) C[i].p = p;
+      if (prefs.getBytes((String("x") + (i + 1)).c_str(), &x, sizeof(x)) == sizeof(x)) C[i].x = x;
+    }
   }
   prefs.end();
 }
@@ -200,20 +330,22 @@ static void clearParams() {
   prefs.begin(NVS_NS, false);
   prefs.clear();
   prefs.end();
-  P = DEFAULTS;
+  nch = 1;
+  for (int i = 0; i < MAX_CH; i++) { C[i].p = DEF[i].p; C[i].x = DEF[i].x; }
 }
 
 // 0 = ok, else a reason. Kept apart from the clamp so "no such parameter" keeps
 // meaning exactly one thing, the way the bar's does.
-static bool setParam(const String& k, float v, String& note) {
+static bool setParam(Chan& c, const String& k, float v, String& note) {
   for (int i = 0; i < N_KNOBS; i++) {
     if (k != KNOBS[i].name) continue;
     v = constrain(v, KNOBS[i].lo, KNOBS[i].hi);
     if (k == "dir") v = (v < 0.0f) ? -1.0f : 1.0f;
-    float oldLo = P.loDeg, oldHi = P.hiDeg;
-    *KNOBS[i].p = v;
-    if (P.loDeg + 5.0f > P.hiDeg) {            // the window must stay a window
-      P.loDeg = oldLo; P.hiDeg = oldHi;
+    if (k == "autoA" || k == "autoB") v = roundf(v);
+    float oldLo = c.p.loDeg, oldHi = c.p.hiDeg;
+    *knobPtr(c, KNOBS[i]) = v;
+    if (c.p.loDeg + 5.0f > c.p.hiDeg) {        // the window must stay a window
+      c.p.loDeg = oldLo; c.p.hiDeg = oldHi;
       note = "refused: need loDeg + 5 <= hiDeg";
       return false;
     }
@@ -225,7 +357,8 @@ static bool setParam(const String& k, float v, String& note) {
 
 // ---------------------------------------------------------------------------
 // The track, cue and position — copied from bar.ino. The renderer is ignorant of
-// transport; it steps whatever track it is handed.
+// transport; it steps whatever track it is handed. One track serves every speech
+// channel.
 // ---------------------------------------------------------------------------
 static const uint16_t TRACK_MAX_FRAMES = 8000;             // 160 s at 50 Hz
 static const uint8_t  FRAME_MS = 20;
@@ -316,20 +449,14 @@ static int32_t trackPosMs() { return (int32_t)(millis() - cueLocalMs) + cueTrack
 // ---------------------------------------------------------------------------
 // The renderer.
 // ---------------------------------------------------------------------------
-static float env = 0.0f;            // smoothed level, 0..1
-static float trackLevel = 0.0f;     // raw level this frame
+static float rawLevel = 0.0f;       // the level every speech channel is fed this frame
+static float trackLevel = 0.0f;     // same, for `st`
 static float envHold = -1.0f;       // >=0: a manual level hold (`env`)
-static float holdDeg = -1.0f;       // >=0: pinned at an angle (`hold`, `open`, `close`)
 static uint32_t speakUntil = 0, speakStart = 0;
 static bool  speechActive = false;
 
-static float angleDeg = 90.0f;      // what is being commanded now, after slew
-static bool  attached = false;
-static bool  limited = false;       // the last target was clipped by loDeg/hiDeg
-static uint32_t restSince = 0;
-
-static float clampDeg(float d) {
-  float lo = fmaxf(0.0f, P.loDeg), hi = fminf(180.0f, P.hiDeg);
+static float clampDeg(const Chan& c, float d) {
+  float lo = fmaxf(0.0f, c.p.loDeg), hi = fminf(180.0f, c.p.hiDeg);
   if (d < lo) d = lo;
   if (d > hi) d = hi;
   return d;
@@ -340,35 +467,40 @@ static float degToUs(float d) {
   return constrain(us, US_MIN, US_MAX);
 }
 
-static void writeAngle(float d) {
-  if (!attached) { ledcAttach(SERVO_PIN, PWM_HZ, PWM_BITS); attached = true; }
+static void writeAngle(int i, float d) {
+  Chan& c = C[i];
+  if (!c.attached) { ledcAttach(CH_PINS[i], PWM_HZ, PWM_BITS); c.attached = true; }
   uint32_t duty = (uint32_t)(((double)degToUs(d) * ((1u << PWM_BITS) - 1)) / PERIOD_US);
-  ledcWrite(SERVO_PIN, duty);
+  ledcWrite(CH_PINS[i], duty);
 }
 
-static void detachServo() {
-  if (!attached) return;
-  ledcDetach(SERVO_PIN);
-  pinMode(SERVO_PIN, OUTPUT);
-  digitalWrite(SERVO_PIN, LOW);
-  attached = false;
+static void detachServo(int i) {
+  Chan& c = C[i];
+  if (!c.attached) return;
+  ledcDetach(CH_PINS[i]);
+  pinMode(CH_PINS[i], OUTPUT);
+  digitalWrite(CH_PINS[i], LOW);
+  c.attached = false;
 }
 
-static float shape(float e) {
-  float x = (e - P.deadband) / fmaxf(0.01f, 1.0f - P.deadband);
+static float shape(const Chan& c, float e) {
+  float x = (e - c.p.deadband) / fmaxf(0.01f, 1.0f - c.p.deadband);
   if (x < 0.0f) x = 0.0f;
-  x = powf(fminf(x, 1.0f), P.curve) * P.gain;
+  x = powf(fminf(x, 1.0f), c.p.curve) * c.p.gain;
   return fminf(x, 1.0f);
 }
 
+// The track (or a hold, or the stand-in) becomes ONE level per frame; each speech
+// channel then smooths and shapes it with its own knobs.
 static void feedSpeech(float dt) {
   float raw = 0.0f;
   trackLevel = 0.0f;
+  float lookahead = C[0].p.lookaheadMs;
   if (envHold >= 0.0f) {
     raw = envHold;
     trackLevel = envHold;
   } else if (playing) {
-    int32_t pos = trackPosMs() + (int32_t)P.lookaheadMs;
+    int32_t pos = trackPosMs() + (int32_t)lookahead;
     if (pos >= 0) {
       uint32_t f = (uint32_t)pos / FRAME_MS;
       if (f >= trackFrames) {
@@ -395,55 +527,161 @@ static void feedSpeech(float dt) {
   }
 
   speechActive = playing || (envHold >= 0.0f) || (speakUntil && millis() < speakUntil);
-
-  float k = (raw > env) ? P.attack : P.release;
-  k = 1.0f - powf(1.0f - k, dt * FPS);
-  env += (raw - env) * k;
-  if (env < 0.002f) env = 0.0f;
+  rawLevel = raw;
 }
 
-static void render(float dt) {
+static float slotDegOf(const Chan& c, int slot) {          // slot is 1-based; < 0 = not defined
+  if (slot < 1 || slot > MAX_SLOTS) return -1.0f;
+  return c.x.slotDeg[slot - 1];
+}
+
+static bool reached(const Chan& c) {
+  float t = (c.manualTarget >= 0.0f) ? c.manualTarget : c.p.closedDeg;
+  return fabsf(c.angle - clampDeg(c, t)) < 0.5f;
+}
+
+static void goSlot(Chan& c, int slot) {
+  c.manualTarget = c.x.slotDeg[slot - 1];
+  c.moveSpeed = c.x.slotSpeed[slot - 1];
+  c.curSlot = slot;
+}
+
+// Move on its own: rest at autoA, visit autoB, come back, wait a jittered gap.
+// A phase that cannot reach its target (a slot beyond the limits) times out
+// instead of waiting forever.
+static void autoTick(Chan& c) {
+  if (!c.autoOn) return;
+  uint32_t now = millis();
+  if ((int32_t)(now - c.autoUntil) >= 0) {
+    c.autoOn = false;
+    int a = (int)c.x.autoA;
+    if (slotDegOf(c, a) >= 0.0f) goSlot(c, a);
+    Serial.println(F("auto: lapsed (not repeated) — stopped"));
+    return;
+  }
+  int a = (int)c.x.autoA, b = (int)c.x.autoB;
+  if (c.autoPhase == 0) {
+    if ((int32_t)(now - c.autoNext) >= 0) {
+      goSlot(c, b); c.autoPhase = 1; c.phaseStart = now; c.holdStart = 0;
+    }
+  } else if (c.autoPhase == 1) {
+    if (!c.holdStart && (reached(c) || now - c.phaseStart > 3000)) c.holdStart = now;
+    if (c.holdStart && now - c.holdStart >= (uint32_t)(c.x.autoHoldS * 1000.0f)) {
+      goSlot(c, a); c.autoPhase = 2; c.phaseStart = now;
+    }
+  } else {
+    if (reached(c) || now - c.phaseStart > 3000) {
+      float r = esp_random() / 4294967295.0f;
+      float gap = c.x.autoGapS * (1.0f + c.x.autoJitter * (2.0f * r - 1.0f));
+      c.autoNext = now + (uint32_t)fmaxf(200.0f, gap * 1000.0f);
+      c.autoPhase = 0;
+    }
+  }
+}
+
+static void render(int i, float dt) {
+  Chan& c = C[i];
+  autoTick(c);
+
   float target;
-  if (holdDeg >= 0.0f) target = holdDeg;
-  else target = P.closedDeg + P.dir * P.swingDeg * shape(env);
-  float clamped = clampDeg(target);
-  limited = fabsf(clamped - target) > 0.01f;
+  float speed = c.p.slewDegS;
+  bool speech = c.x.mode < 0.5f;
+
+  if (speech) {
+    float k = (rawLevel > c.env) ? c.p.attack : c.p.release;
+    k = 1.0f - powf(1.0f - k, dt * FPS);
+    c.env += (rawLevel - c.env) * k;
+    if (c.env < 0.002f) c.env = 0.0f;
+  } else {
+    c.env = 0.0f;
+  }
+
+  if (c.holdDeg >= 0.0f) {
+    target = c.holdDeg;
+  } else if (speech) {
+    target = c.p.closedDeg + c.p.dir * c.p.swingDeg * shape(c, c.env);
+  } else if (c.manualTarget >= 0.0f) {
+    target = c.manualTarget;
+    speed = c.moveSpeed;
+  } else {
+    target = c.p.closedDeg;
+  }
+  float clamped = clampDeg(c, target);
+  c.limited = fabsf(clamped - target) > 0.01f;
   target = clamped;
 
   // The most the servo is ASKED to move. A real S51 cannot follow a raw 50 Hz
   // envelope, and asking it to is how a servo chatters and wears.
-  float maxStep = P.slewDegS * dt;
-  float d = target - angleDeg;
+  float maxStep = speed * dt;
+  float d = target - c.angle;
   if (d >  maxStep) d =  maxStep;
   if (d < -maxStep) d = -maxStep;
-  angleDeg += d;
+  c.angle += d;
 
-  bool atRest = fabsf(angleDeg - clampDeg(P.closedDeg)) < 0.05f && !speechActive && holdDeg < 0.0f;
-  if (!atRest) restSince = millis();
-  if (P.idleDetachS > 0.0f && atRest && millis() - restSince > (uint32_t)(P.idleDetachS * 1000.0f)) {
-    detachServo();
+  bool atRest = speech
+      ? (fabsf(c.angle - clampDeg(c, c.p.closedDeg)) < 0.05f && !speechActive && c.holdDeg < 0.0f)
+      : (fabsf(c.angle - target) < 0.05f && !c.autoOn && c.holdDeg < 0.0f);
+  if (!atRest) c.restSince = millis();
+  if (c.p.idleDetachS > 0.0f && atRest && millis() - c.restSince > (uint32_t)(c.p.idleDetachS * 1000.0f)) {
+    detachServo(i);
     return;
   }
-  writeAngle(angleDeg);
+  writeAngle(i, c.angle);
 }
 
 // ---------------------------------------------------------------------------
 // Commands.
 // ---------------------------------------------------------------------------
 
-static String knobValue(int i) {
+static void reply(const String& m) { Serial.println(m); linkSend(m); }
+
+static String knobValue(Chan& c, int i) {
   char b[16];
-  snprintf(b, sizeof(b), "%g", *KNOBS[i].p);
+  snprintf(b, sizeof(b), "%g", *knobPtr(c, KNOBS[i]));
   return String(b);
 }
 
+static String modeName(const Chan& c) { return c.x.mode < 0.5f ? "speech" : "manual"; }
+
+static String posOf(const Chan& c) {
+  if (c.x.mode < 0.5f) return "-";
+  if (c.curSlot < 1) return "home";
+  float d = slotDegOf(c, c.curSlot);
+  return (d >= 0.0f && fabsf(c.angle - clampDeg(c, d)) < 0.5f) ? String(c.curSlot) : String("between");
+}
+
+static String slotsLine(int i) {
+  Chan& c = C[i];
+  String out = "slots ch=" + String(i + 1) + " mode=" + modeName(c);
+  for (int k = N_PARAM_KNOBS; k < N_KNOBS; k++) out += String(" ") + KNOBS[k].name + "=" + knobValue(c, k);
+  for (int s = 0; s < MAX_SLOTS; s++)
+    if (c.x.slotDeg[s] >= 0.0f) out += " " + String(s + 1) + "=" + String(c.x.slotDeg[s], 0) + "/" + String(c.x.slotSpeed[s], 0);
+  return out;
+}
+
 static void showParams() {
-  for (int i = 0; i < N_KNOBS; i++) {
-    Serial.print(KNOBS[i].name);
-    for (int pad = strlen(KNOBS[i].name); pad < 13; pad++) Serial.print(' ');
-    Serial.println(knobValue(i));
+  for (int i = 0; i < nch; i++) {
+    if (nch > 1) Serial.printf("-- channel %d (%s) --\n", i + 1, modeName(C[i]).c_str());
+    for (int k = 0; k < N_KNOBS; k++) {
+      Serial.print(KNOBS[k].name);
+      for (int pad = strlen(KNOBS[k].name); pad < 13; pad++) Serial.print(' ');
+      Serial.println(knobValue(C[i], k));
+    }
+    Serial.println(slotsLine(i));
   }
-  Serial.print(F("env (live)   ")); Serial.println(env, 3);
+  Serial.print(F("env (live)   ")); Serial.println(C[0].env, 3);
+}
+
+// "2" -> 1 (a zero-based channel); returns -1 for anything that is not 1..nch.
+static int chArg(const String& s) {
+  String t = s; t.trim();
+  if (!t.length() || t[0] < '1' || t[0] > '9') return -1;
+  int n = t.toInt();
+  return (n >= 1 && n <= nch) ? n - 1 : -1;
+}
+
+static String noChannel(const String& s) {
+  return "refused: no channel " + s + " (channels=" + String(nch) + ")";
 }
 
 static void handleLine(String line) {
@@ -454,45 +692,63 @@ static void handleLine(String line) {
   String rest = (sp < 0) ? ""   : line.substring(sp + 1);
   rest.trim();
 
-  // `show` prints one knob per line on serial and answers over the radio with a
-  // single line of key=value pairs, so the web UI can read every setting without
-  // opening the board's serial port (which reboots it).
+  // `show` prints one knob per line on serial and answers over the radio in a few
+  // lines of key=value pairs, so the web UI can read every setting without opening
+  // the board's serial port (which reboots it). The FIRST line is channel 1's and
+  // has no `ch=` — exactly what a single-servo box has always read. Then, per
+  // extra channel, `show ch=N ...`; then `slots ch=N ...` for every channel.
   if (verb == "show" || verb == "get") {
     showParams();
     String out = "show";
-    for (int i = 0; i < N_KNOBS; i++) out += String(" ") + KNOBS[i].name + "=" + knobValue(i);
+    for (int k = 0; k < N_PARAM_KNOBS; k++) out += String(" ") + KNOBS[k].name + "=" + knobValue(C[0], k);
     linkSend(out);
+    for (int i = 1; i < nch; i++) {
+      String o = "show ch=" + String(i + 1);
+      for (int k = 0; k < N_PARAM_KNOBS; k++) o += String(" ") + KNOBS[k].name + "=" + knobValue(C[i], k);
+      linkSend(o);
+    }
+    for (int i = 0; i < nch; i++) linkSend(slotsLine(i));
     return;
   }
 
   // The one-line state reply. First token `dev=jaw` so a reader can tell this
   // from the bar's `st amb=...` without knowing which address it came from.
+  // Channel 1 is the header; `st ch=N` lines follow, one per channel.
   if (verb == "st") {
-    float openD = P.closedDeg + P.dir * P.swingDeg;
-    String out = "st dev=jaw closed=" + String(P.closedDeg, 1)
-               + " swing=" + String(P.swingDeg, 1)
-               + " dir=" + String((int)P.dir)
+    Chan& c = C[0];
+    float openD = c.p.closedDeg + c.p.dir * c.p.swingDeg;
+    String out = "st dev=jaw channels=" + String(nch) + " closed=" + String(c.p.closedDeg, 1)
+               + " swing=" + String(c.p.swingDeg, 1)
+               + " dir=" + String((int)c.p.dir)
                + " open=" + String(openD, 1)
-               + " lo=" + String(P.loDeg, 0) + " hi=" + String(P.hiDeg, 0)
-               + " deg=" + String(angleDeg, 1)
-               + " us=" + String((int)degToUs(angleDeg))
-               + " env=" + String(env, 2)
+               + " lo=" + String(c.p.loDeg, 0) + " hi=" + String(c.p.hiDeg, 0)
+               + " deg=" + String(c.angle, 1)
+               + " us=" + String((int)degToUs(c.angle))
+               + " env=" + String(c.env, 2)
                + " lvl=" + String(trackLevel, 2)
-               + " hold=" + (holdDeg >= 0.0f ? String(holdDeg, 1) : String("-"))
-               + (limited ? " limited=1" : "")
-               + (attached ? "" : " detached=1")
+               + " hold=" + (c.holdDeg >= 0.0f ? String(c.holdDeg, 1) : String("-"))
+               + (c.limited ? " limited=1" : "")
+               + (c.attached ? "" : " detached=1")
                + " trk=" + String(trackFrames)
                + " clip=" + String(trackClip)
                + (playing ? " playing@" + String(trackPosMs()) : " idle");
     Serial.println(out);
     linkSend(out);
+    for (int i = 0; i < nch; i++) {
+      Chan& d = C[i];
+      String o = "st ch=" + String(i + 1) + " mode=" + modeName(d) + " pos=" + posOf(d)
+               + " auto=" + (d.autoOn ? "on" : "off") + " attached=" + (d.attached ? "1" : "0")
+               + " deg=" + String(d.angle, 1);
+      Serial.println(o);
+      linkSend(o);
+    }
     return;
   }
 
   if (verb == "save") {
     saveParams();
     String m = "saved params" + String(trackFrames ? " (track already on flash)" : "");
-    Serial.println(m); linkSend(m);
+    reply(m);
     return;
   }
 
@@ -500,73 +756,183 @@ static void handleLine(String line) {
     clearParams();
     if (fsReady) LittleFS.remove(TRACK_PATH);
     trackFrames = 0; trackClip = 0; playing = false;
-    String m = "forgot everything — compiled defaults, no track";
-    Serial.println(m); linkSend(m);
+    for (int i = 1; i < MAX_CH; i++) detachServo(i);
+    reply("forgot everything — compiled defaults, no track");
     return;
   }
 
   if (verb == "help") {
-    Serial.println(F("show | get              every setting (one line over the radio)"));
-    Serial.println(F("st                      state: angle, level, track, clip"));
-    Serial.println(F("set <key> <value>       change a setting (see show for keys)"));
+    Serial.println(F("show | get              every setting (a few lines over the radio)"));
+    Serial.println(F("st                      state: header (channel 1) then one line per channel"));
+    Serial.println(F("set [<ch>.]<key> <v>    change a setting (see show for keys)"));
     Serial.println(F("save | forget           keep settings across power cycles | back to defaults"));
+    Serial.println(F("channels <1..4>         how many servos this board drives"));
+    Serial.println(F("mode <ch> speech|manual   slot <ch> <n> <deg> <speed>|clear"));
+    Serial.println(F("go <ch> <n>             go to position slot n   auto <ch> on|off"));
     Serial.println(F("speak <s> | env <0..1>  synthetic speech | hold a level;  idle releases"));
-    Serial.println(F("hold <deg> | open | close   pin the jaw (clamped to loDeg..hiDeg)"));
+    Serial.println(F("hold [<ch>] <deg> | open [<ch>] | close [<ch>]   pin a servo (clamped)"));
     Serial.println(F("trk begin|d|end         load an envelope track"));
     Serial.println(F("cue <clip> <ms> <lead>  start it, on the box's clock"));
-    Serial.println(F("pos <ms>                correction, eased; stop  release to idle"));
+    Serial.println(F("pos <ms>                correction, eased; stop = release the track; stop all = also end every auto"));
+    return;
+  }
+
+  if (verb == "channels") {
+    int n = rest.toInt();
+    if (n < 1 || n > MAX_CH) { reply("refused: channels must be 1.." + String(MAX_CH)); return; }
+    for (int i = n; i < nch; i++) { C[i].autoOn = false; detachServo(i); }
+    nch = n;
+    reply("ok channels = " + String(nch));
     return;
   }
 
   if (verb == "set") {
     int s2 = rest.indexOf(' ');
-    if (s2 < 0) { Serial.println(F("set <key> <value>")); linkSend("set <key> <value>"); return; }
+    if (s2 < 0) { reply("set [<ch>.]<key> <value>"); return; }
     String k = rest.substring(0, s2);
     float v = rest.substring(s2 + 1).toFloat();
-    String note;
-    String m;
-    if (setParam(k, v, note)) {
-      for (int i = 0; i < N_KNOBS; i++) if (k == KNOBS[i].name) m = "ok " + k + " = " + knobValue(i);
+    int ch = 0;
+    if (k.length() > 2 && k[0] >= '1' && k[0] <= '9' && k[1] == '.') {
+      ch = chArg(k.substring(0, 1));
+      if (ch < 0) { reply(noChannel(k.substring(0, 1))); return; }
+      k = k.substring(2);
+    }
+    String note, m;
+    if (setParam(C[ch], k, v, note)) {
+      for (int i = 0; i < N_KNOBS; i++) if (k == KNOBS[i].name) m = "ok " + (ch ? String(ch + 1) + "." : String("")) + k + " = " + knobValue(C[ch], i);
     } else {
       m = note;
     }
-    Serial.println(m); linkSend(m);
+    reply(m);
+    return;
+  }
+
+  if (verb == "mode") {
+    int s2 = rest.indexOf(' ');
+    int ch = chArg(s2 < 0 ? rest : rest.substring(0, s2));
+    String what = (s2 < 0) ? "" : rest.substring(s2 + 1);
+    what.trim();
+    if (ch < 0) { reply(noChannel(s2 < 0 ? rest : rest.substring(0, s2))); return; }
+    if (what != "speech" && what != "manual") { reply("refused: mode is speech or manual"); return; }
+    Chan& c = C[ch];
+    c.x.mode = (what == "manual") ? 1.0f : 0.0f;
+    c.autoOn = false; c.manualTarget = -1.0f; c.holdDeg = -1.0f; c.curSlot = 0;
+    reply("ok mode " + String(ch + 1) + " " + what);
+    return;
+  }
+
+  if (verb == "slot") {                         // slot <ch> <n> <deg> <speed> | slot <ch> <n> clear
+    String a[4]; int na = 0; String t = rest;
+    while (t.length() && na < 4) {
+      int s2 = t.indexOf(' ');
+      a[na++] = (s2 < 0) ? t : t.substring(0, s2);
+      t = (s2 < 0) ? "" : t.substring(s2 + 1);
+      t.trim();
+    }
+    int ch = (na >= 1) ? chArg(a[0]) : -1;
+    if (ch < 0) { reply(noChannel(na ? a[0] : String("?"))); return; }
+    int n = (na >= 2) ? a[1].toInt() : 0;
+    if (n < 1 || n > MAX_SLOTS) { reply("refused: slot is 1.." + String(MAX_SLOTS)); return; }
+    Chan& c = C[ch];
+    if (na == 3 && a[2] == "clear") {
+      c.x.slotDeg[n - 1] = -1.0f;
+      reply("ok slot " + String(ch + 1) + " " + String(n) + " cleared");
+      return;
+    }
+    if (na < 4) { reply("slot <ch> <n> <deg> <speed> | slot <ch> <n> clear"); return; }
+    c.x.slotDeg[n - 1]   = constrain(a[2].toFloat(), 0.0f, 180.0f);
+    c.x.slotSpeed[n - 1] = constrain(a[3].toFloat(), 30.0f, 1000.0f);
+    reply("ok slot " + String(ch + 1) + " " + String(n) + " = " + String(c.x.slotDeg[n - 1], 0) + "/" + String(c.x.slotSpeed[n - 1], 0));
+    return;
+  }
+
+  if (verb == "go") {
+    int s2 = rest.indexOf(' ');
+    String chs = (s2 < 0) ? rest : rest.substring(0, s2);
+    int ch = chArg(chs);
+    if (ch < 0) { reply(noChannel(chs)); return; }
+    Chan& c = C[ch];
+    if (c.x.mode < 0.5f) { reply("refused: channel " + String(ch + 1) + " is a speech channel"); return; }
+    int n = (s2 < 0) ? 0 : rest.substring(s2 + 1).toInt();
+    if (n < 1 || n > MAX_SLOTS) { reply("refused: slot is 1.." + String(MAX_SLOTS)); return; }
+    if (slotDegOf(c, n) < 0.0f) { reply("refused: slot " + String(n) + " not defined on channel " + String(ch + 1)); return; }
+    c.autoOn = false; c.holdDeg = -1.0f;       // an explicit position ends the repeat
+    goSlot(c, n);
+    reply("ok go " + String(ch + 1) + " " + String(n));
+    return;
+  }
+
+  if (verb == "auto") {
+    int s2 = rest.indexOf(' ');
+    String chs = (s2 < 0) ? rest : rest.substring(0, s2);
+    String what = (s2 < 0) ? "" : rest.substring(s2 + 1);
+    what.trim();
+    int ch = chArg(chs);
+    if (ch < 0) { reply(noChannel(chs)); return; }
+    Chan& c = C[ch];
+    if (c.x.mode < 0.5f) { reply("refused: channel " + String(ch + 1) + " is a speech channel"); return; }
+    if (what == "off") {
+      if (c.autoOn) { c.autoOn = false; int a = (int)c.x.autoA; if (slotDegOf(c, a) >= 0.0f) goSlot(c, a); }
+      reply("ok auto " + String(ch + 1) + " off");
+      return;
+    }
+    if (what != "on") { reply("auto <ch> on|off"); return; }
+    int a = (int)c.x.autoA, b = (int)c.x.autoB;
+    if (slotDegOf(c, a) < 0.0f || slotDegOf(c, b) < 0.0f || a == b) {
+      reply("refused: autoA/autoB (" + String(a) + "/" + String(b) + ") must be two different defined slots");
+      return;
+    }
+    uint32_t now = millis();
+    c.autoUntil = now + AUTO_DEADMAN_MS;       // every `auto on` re-arms the dead-man
+    if (!c.autoOn) {                           // a repeat of `on` must not restart the cycle
+      c.autoOn = true; c.holdDeg = -1.0f;
+      goSlot(c, a);
+      c.autoPhase = 0;
+      float r = esp_random() / 4294967295.0f;
+      c.autoNext = now + (uint32_t)fmaxf(200.0f, c.x.autoGapS * 1000.0f * (0.5f + r));
+    }
+    reply("ok auto " + String(ch + 1) + " on");
     return;
   }
 
   if (verb == "speak") {
     float secs = rest.length() ? rest.toFloat() : 4.0f;
-    envHold = -1.0f; holdDeg = -1.0f;
+    envHold = -1.0f; for (int i = 0; i < MAX_CH; i++) C[i].holdDeg = -1.0f;
     speakStart = millis();
     speakUntil = speakStart + (uint32_t)(secs * 1000);
-    String m = "speaking for " + String(secs, 1) + "s";
-    Serial.println(m); linkSend(m);
+    reply("speaking for " + String(secs, 1) + "s");
     return;
   }
 
   if (verb == "env") {
     envHold = constrain(rest.toFloat(), 0.0f, 1.0f);
-    speakUntil = 0; holdDeg = -1.0f;
-    String m = "env held at " + String(envHold, 2);
-    Serial.println(m); linkSend(m);
+    speakUntil = 0; for (int i = 0; i < MAX_CH; i++) C[i].holdDeg = -1.0f;
+    reply("env held at " + String(envHold, 2));
     return;
   }
 
   if (verb == "idle") {
-    envHold = -1.0f; speakUntil = 0; holdDeg = -1.0f;
-    String m = "idle — released";
-    Serial.println(m); linkSend(m);
+    envHold = -1.0f; speakUntil = 0; for (int i = 0; i < MAX_CH; i++) C[i].holdDeg = -1.0f;
+    reply("idle — released");
     return;
   }
 
+  // hold <deg> | hold <ch> <deg> ; open [<ch>] ; close [<ch>] — bench calibration
   if (verb == "hold" || verb == "open" || verb == "close") {
-    float d = (verb == "open")  ? P.closedDeg + P.dir * P.swingDeg
-            : (verb == "close") ? P.closedDeg
-            : rest.toFloat();
-    holdDeg = clampDeg(constrain(d, 0.0f, 180.0f));
+    int s2 = rest.indexOf(' ');
+    int ch = 0;
+    String degArg = rest;
+    if (verb == "hold" && s2 >= 0) { ch = chArg(rest.substring(0, s2)); degArg = rest.substring(s2 + 1); }
+    else if (verb != "hold" && rest.length()) ch = chArg(rest);
+    if (ch < 0) { reply(noChannel(rest)); return; }
+    Chan& c = C[ch];
+    float d = (verb == "open")  ? c.p.closedDeg + c.p.dir * c.p.swingDeg
+            : (verb == "close") ? c.p.closedDeg
+            : degArg.toFloat();
+    c.holdDeg = clampDeg(c, constrain(d, 0.0f, 180.0f));
+    c.autoOn = false;
     envHold = -1.0f; speakUntil = 0;
-    String m = "hold " + String(holdDeg, 1) + " deg";
-    Serial.println(m); linkSend(m);
+    reply("hold " + (ch ? String(ch + 1) + ": " : String("")) + String(c.holdDeg, 1) + " deg");
     return;
   }
 
@@ -582,25 +948,22 @@ static void handleLine(String line) {
       rxFrames = (uint16_t)args.substring(s3 + 1).toInt();
       rxBytes = 0; trackFrames = 0; playing = false;
       if (rxFrames == 0 || rxFrames > TRACK_MAX_FRAMES) {
-        String e = "trk err frames " + String(rxFrames) + " out of range";
-        Serial.println(e); linkSend(e);
+        reply("trk err frames " + String(rxFrames) + " out of range");
         rxFrames = 0;
         return;
       }
-      String m = "trk begin ok clip=" + String(trackClip) + " frames=" + String(rxFrames);
-      Serial.println(m); linkSend(m);
+      reply("trk begin ok clip=" + String(trackClip) + " frames=" + String(rxFrames));
       return;
     }
 
     if (sub == "d") {
-      if (!rxFrames) { String e = "trk err no begin"; Serial.println(e); linkSend(e); return; }
+      if (!rxFrames) { reply("trk err no begin"); return; }
       int s3 = args.indexOf(' ');
       uint32_t seq = (uint32_t)args.substring(0, s3).toInt();
       String payload = args.substring(s3 + 1);
       uint32_t at = seq * TRACK_CHUNK_BYTES;
       if (at != rxBytes) {                       // a lost chunk must not shift every later frame
-        String e = "trk err seq " + String(seq) + " expected byte " + String(rxBytes) + " got " + String(at);
-        Serial.println(e); linkSend(e);
+        reply("trk err seq " + String(seq) + " expected byte " + String(rxBytes) + " got " + String(at));
         rxFrames = 0;
         return;
       }
@@ -612,42 +975,38 @@ static void handleLine(String line) {
     if (sub == "end") {
       uint32_t want = (uint32_t)rxFrames * 2;
       if (rxBytes < want) {
-        String e = "trk err short " + String(rxBytes) + " of " + String(want);
-        Serial.println(e); linkSend(e);
+        reply("trk err short " + String(rxBytes) + " of " + String(want));
         rxFrames = 0;
         return;
       }
       trackFrames = rxFrames;
       rxFrames = 0;
       bool saved = saveTrack();
-      String m = "trk ok " + String(trackClip) + " " + String(trackFrames) + (saved ? " saved" : " (not saved)");
-      Serial.println(m); linkSend(m);
+      reply("trk ok " + String(trackClip) + " " + String(trackFrames) + (saved ? " saved" : " (not saved)"));
       return;
     }
 
-    String e = "trk err unknown " + sub;
-    Serial.println(e); linkSend(e);
+    reply("trk err unknown " + sub);
     return;
   }
 
   // cue <clip> <position_ms> <lead_ms>, sent at ACTUAL playback start.
   if (verb == "cue") {
-    if (!trackFrames) { String e = "cue err no track"; Serial.println(e); linkSend(e); return; }
+    if (!trackFrames) { reply("cue err no track"); return; }
     int a1 = rest.indexOf(' ');
     int a2 = rest.indexOf(' ', a1 + 1);
     uint16_t clip = (uint16_t)rest.substring(0, a1).toInt();
     int32_t posMs = rest.substring(a1 + 1, a2 < 0 ? rest.length() : a2).toInt();
     int32_t lead = (a2 < 0) ? 0 : rest.substring(a2 + 1).toInt();
     if (clip != trackClip) {
-      String e = "cue err clip " + String(clip) + " but loaded " + String(trackClip);
-      Serial.println(e); linkSend(e); return;
+      reply("cue err clip " + String(clip) + " but loaded " + String(trackClip));
+      return;
     }
     cueLocalMs = millis();
     cueTrackMs = posMs + lead;
     playing = true;
-    envHold = -1.0f; speakUntil = 0; holdDeg = -1.0f;
-    String m = "cue ok " + String(clip) + " at " + String(posMs) + " lead " + String(lead);
-    Serial.println(m); linkSend(m);
+    envHold = -1.0f; speakUntil = 0; for (int i = 0; i < MAX_CH; i++) C[i].holdDeg = -1.0f;
+    reply("cue ok " + String(clip) + " at " + String(posMs) + " lead " + String(lead));
     return;
   }
 
@@ -661,9 +1020,20 @@ static void handleLine(String line) {
     return;
   }
 
+  // `stop` releases the TRACK only: the box sends it at the end of every spoken
+  // line, in the middle of a show, and a blink must survive that. `stop all` is
+  // for the end of a show and also ends every channel's `auto`.
   if (verb == "stop" || verb == "eof") {
     playing = false;
-    Serial.println(F("track: released"));
+    if (rest == "all") {
+      for (int i = 0; i < MAX_CH; i++) {
+        Chan& c = C[i];
+        if (c.autoOn) { c.autoOn = false; int a = (int)c.x.autoA; if (slotDegOf(c, a) >= 0.0f) goSlot(c, a); }
+      }
+      Serial.println(F("track: released, every auto stopped"));
+    } else {
+      Serial.println(F("track: released"));
+    }
     return;
   }
 
@@ -685,39 +1055,45 @@ void setup() {
   uint32_t t0 = millis();
   while (!Serial && millis() - t0 < 1500) { delay(10); }
 
-  DEFAULTS = P;
+  for (int i = 1; i < MAX_CH; i++) { C[i].x.mode = 1.0f; }   // a second servo is rarely a mouth
+  for (int i = 0; i < MAX_CH; i++) DEF[i] = C[i];
   loadParams();
 
   // Straight to the closed angle, before the filesystem and the radio, so the
-  // jaw does not wait on either to reach rest. (Whatever the servo is doing when
-  // power arrives, it is whatever the signal pin did before this line.)
-  pinMode(SERVO_PIN, OUTPUT);
-  digitalWrite(SERVO_PIN, LOW);
-  angleDeg = clampDeg(P.closedDeg);
-  writeAngle(angleDeg);
+  // servo does not wait on either to reach rest. (Whatever it is doing when power
+  // arrives, it is whatever the signal pin did before this line.)
+  for (int i = 0; i < nch; i++) {
+    pinMode(CH_PINS[i], OUTPUT);
+    digitalWrite(CH_PINS[i], LOW);
+    C[i].angle = clampDeg(C[i], C[i].p.closedDeg);
+    writeAngle(i, C[i].angle);
+  }
 
   fsReady = LittleFS.begin(true);
   bool restored = loadTrack();
   linkBegin();
 
   Serial.println();
-  Serial.println(F("=== jaw — servo mouth ===================================="));
-  Serial.printf ("closed %.1f deg, swing %.1f deg (dir %+d), limits %.0f..%.0f\n",
-                 P.closedDeg, P.swingDeg, (int)P.dir, P.loDeg, P.hiDeg);
+  Serial.println(F("=== jaw — servo remote ==================================="));
+  for (int i = 0; i < nch; i++)
+    Serial.printf("ch %d (%s): closed %.1f deg, swing %.1f deg (dir %+d), limits %.0f..%.0f\n",
+                  i + 1, modeName(C[i]).c_str(), C[i].p.closedDeg, C[i].p.swingDeg, (int)C[i].p.dir,
+                  C[i].p.loDeg, C[i].p.hiDeg);
   Serial.print  (F("storage  : "));
   if (!fsReady)        Serial.println(F("LittleFS UNAVAILABLE — a power cycle will lose the track"));
   else if (restored)   Serial.printf("track restored, clip %u, %u frames\n", trackClip, trackFrames);
   else                 Serial.println(F("ready, no stored track"));
   Serial.print  (F("my MAC   : ")); Serial.println(WiFi.macAddress());
   Serial.print  (F("link     : ")); Serial.println(linkUp ? F("ESP-NOW up, ch 1") : F("DOWN — serial only"));
-  Serial.println(F("commands : show | st | set <k> <v> | speak <s> | hold <deg> | open | close | help"));
-  Serial.println(F("Idle is speech with a zero envelope — there is no mode."));
+  Serial.println(F("commands : show | st | set <k> <v> | speak <s> | hold <deg> | go <ch> <n> | help"));
+  Serial.println(F("On a speech channel, idle is speech with a zero envelope."));
   Serial.println(F("=========================================================="));
 }
 
 void loop() {
   static uint32_t lastUs = micros();
   pollSerial();
+  pumpTx();
 
   if (rxPending) {
     String line(rxBuf);
@@ -736,5 +1112,5 @@ void loop() {
   if (dt > 0.1f) dt = 0.1f;
 
   feedSpeech(dt);
-  render(dt);
+  for (int i = 0; i < nch; i++) render(i, dt);
 }

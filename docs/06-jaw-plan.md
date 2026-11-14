@@ -289,7 +289,9 @@ channel and slot NUMBERS only.
 | `slot <ch> <n> <deg> <speed>` | define position slot n (angle, travel speed) |
 | `go <ch> <n>` | go to slot n, eased at its speed → `ok go <ch> <n>`; `refused ...` on a speech channel |
 | `auto <ch> on\|off` | Move on its own → `ok auto ...`; `refused ...` on a speech channel |
-| `stop` | also ends every channel's `auto` |
+| `stop` | releases the TRACK only (see below) |
+| `stop all` | also ends every channel's `auto` |
+| `channels <n>` | how many servos the board drives (1..4; channel 1 on D10, 2..4 on D1..D3) |
 
 - A cue/track drives only speech channels.
 - **Dead-man:** `auto on` expires after 120 s unless repeated (the box re-sends every 60 s while
@@ -300,3 +302,24 @@ channel and slot NUMBERS only.
 - `show`: one `show ch=N closedDeg=...` line per channel, and `slots ch=N 1=<deg>/<speed> ...`
   lines. Each under one radio frame.
 - The name `pos` stays the track-clock correction; there is no `pos2`.
+
+**As built (firmware/jaw/jaw.ino), where it differs from the table above:**
+
+- `stop` stays track-only. The box sends it at the end of every spoken line, in the middle of a
+  show, and a blink must survive that. The end of a show sends `auto <ch> off` for each channel
+  (or `stop all`), and the 120 s dead-man backs both up.
+- `go` ends that channel's `auto` (a forced position must hold), so the box must not keep
+  re-sending `auto on` while it wants a held position.
+- `show` answers with: the channel-1 line exactly as before (no `ch=`), then `show ch=N ...`
+  for each extra channel, then `slots ch=N mode=... autoA= autoB= autoGapS= autoJitter=
+  autoHoldS= 1=<deg>/<speed> ...` for every channel (undefined slots omitted).
+- `st` answers with the old header (plus `channels=N` right after `dev=jaw`), then
+  `st ch=N mode= pos= auto= attached= deg=` per channel. `pos=` is the slot number, `between`
+  while moving, `home` before any `go`, `-` on a speech channel.
+- A reply of several lines goes out through a queue that waits for each send to COMPLETE (25 ms
+  apart), because a second send queued before the first finishes loses both.
+- Channels 2..4 start as manual; channel 1 as speech. Channel 1's saved settings keep their old
+  NVS key, so a board tuned before this firmware keeps them.
+- Tested on the bench by serial only: slots, `go`, refusals, `auto` cycling at the set gap,
+  `stop all`, channel 1's saved 90° test config surviving. NOT tested: the multi-line replies over
+  the radio and the bridge, a servo on channels 2..4, speech on two channels at once.
