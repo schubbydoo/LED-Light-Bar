@@ -9,6 +9,8 @@ Two sketches, two ends of one radio link, versioned together — see the note in
 | `bringup/` | Five staged hardware questions, with the strip attached. |
 | `pixelcheck/` | Whole-strip primaries and fixed markers, held. For when `bringup` raises a question about one pixel or one channel — it removes motion from the answer. |
 | `bar/` | The light bar — the ambience renderer. **Tunable live over serial.** |
+| `jawcheck/` | Steady hardware-timed servo pulse on D10, moved a little at a time over serial. For finding a servo's real limits on a real mechanism. |
+| `jaw/` | A servo mouth that speaks. **The bar's remote with the strip swapped for a servo** — same link, track, cue, persistence and command language. Written 2026-11-14, bench-tested only (no jaw, no radio, no real track). |
 | `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW, to one or more props. **Working for the bar; multi-prop addressing written 2026-11-12, not yet flashed.** |
 
 ---
@@ -354,3 +356,24 @@ Compiled defaults are the approved values — `flashHue 0`, `flash 0.6`, `blacko
 **Next, in order:** persist the track to flash; re-judge the palette on matte warm card;
 then a `PIXEL` channel kind and a flow step on the box so this runs from the Show page
 rather than from an SSH session.
+
+
+---
+
+## `jaw/` — the servo remote
+
+Same board, same link, same commands as the bar; only the renderer differs, so the box and its
+web UI treat it as one more remote. `angle = closed + dir * swing * shape(env)`, and at zero
+envelope that is exactly `closed` — idle is speech with a zero envelope, as on the bar.
+
+`show` answers over the radio as **one line of `key=value`** (so a UI can read every setting
+without opening the board's serial port, which reboots it) and `st` begins `st dev=jaw ...`.
+Settings, ranges and defaults are in the header of `jaw/jaw.ino`; `set <key> <value>` changes
+one and `save` keeps them. `swingDeg` is the one to reach for first (default 20).
+
+Calibrate with the jaw mounted: `hold <deg>`, `open`, `close`, widening `loDeg`/`hiDeg` a few
+degrees at a time while watching a power meter. A servo driven into a stop draws its stall
+current (459 mA measured, `docs/07-servo-s51.md`) until told to move.
+
+**Untested:** the jaw against a real mechanism, anything over the radio, and a real track.
+The defaults are starting points for tuning by eye.
