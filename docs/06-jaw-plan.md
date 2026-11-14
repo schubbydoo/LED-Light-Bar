@@ -134,7 +134,7 @@ the addendum — a jaw and a fire on the same greeting — and nothing has tried
 | Item | Status |
 |---|---|
 | XIAO ESP32C3 ×1 (buy 2 for a spare) | **Buy**, ~$6 each. Ships with its u.FL antenna |
-| S51 servo | On hand. **Stall current and voltage range unknown — to be measured** (§7) |
+| S51 servo | On hand. Datasheet in `docs/07-servo-s51.md`: 4.8–6.0 V, 180°. **Stall current is not on it — to be measured** (§6) |
 | Bulk capacitor, 470–1000 µF 16 V, at the servo | Probably in the bins (same part as the bar's) |
 | Schottky diode + small cap for the XIAO's own supply | ~$1 |
 | 10 kΩ pull-down for the servo signal line | Bins |
@@ -234,7 +234,7 @@ depend on anyone's memory.
 
 ## 9. Open items
 
-1. S51 stall current and voltage range — measure (§6).
+1. S51 stall current — measure (§6). Voltage range is known: 4.8–6.0 V (`docs/07-servo-s51.md`).
 2. Which 5 V source powers the jaw.
 3. Does the SFX Box play two clips at once, each with its own position feed? (SFX Box repo.)
 4. Does the jaw want a word-structured track rather than the gated envelope? Decide by looking,
