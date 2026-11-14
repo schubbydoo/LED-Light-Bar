@@ -90,23 +90,45 @@ These are the no-load numbers. A jaw has a load.
 
 ## 5. Measured on this servo
 
-**2026-11-14, `firmware/jawcheck/`, horn off, nothing on the output, 5 V.** Current read on a USB
-power meter in line with the servo supply, so it averages and **misses short spikes**. The servo
-was powered from a **breadboard 5 V / 3.3 V power module, fed over USB from a 2 A wall adapter**.
-The module's rail voltage under load was not measured, and the adapter's 2 A is its rating, not a
-measurement.
+**2026-11-14, `firmware/jawcheck/`, small free lever on the shaft, nothing on the output, 5 V**
+from a breadboard 5 V / 3.3 V power module fed over USB from a 2 A wall adapter. The module's
+rail voltage under load and the adapter's real limit were not measured.
 
-| Condition | Measured | Note |
+**Two meters, two different things — do not mix them up:**
+
+- **USB meter at the wall** (wall → meter → module): the draw of the WHOLE board, which includes
+  the module's own LED and regulator. About **25 mA of it is the module**, not the servo.
+- **DM6000AR multimeter in series with the servo's red lead**, on its 400 mA port: the servo alone.
+  Added after the first readings below were taken.
+
+| Condition | Servo alone (DM6000AR) | Whole board (USB meter) |
 |---|---|---|
-| Powered, **no pulse** (floating signal, then no firmware) | 24–32 mA, swinging, no movement | not an idle figure — nothing was commanded |
-| **Holding 1500 µs**, no load | **24–28 mA** | steady, no twitch |
-| **Slow sweep**, 1000–2000 µs, no load | **peak 167 mA** | 20 µs per 40 ms (≈ 45°/s). Two sweeps, same result. Motion judged by eye as normal |
+| **Holding 1500 µs**, no load | **3.28 mA** | 24–28 mA |
+| Powered, no pulse | not measured | 24–32 mA, no movement |
+| **Slow sweep**, 1000–2000 µs, no load | **peak 61.36 mA** (MAX mode) | peak 167 mA (an earlier sweep) |
+| **Stalled** — lever gripped by hand, about 1 s, commanded 1900 µs against it | **peak 459 mA** (10 A port, MAX mode) | not recorded |
+
+Slow sweep = 20 µs per 40 ms (about 45°/s), two sweeps, same peak. Both meters average and miss
+short spikes.
+
+**The 167 mA whole-board peak is not the servo's.** Taking the module's ~25 mA away from it
+suggested ~140 mA for the servo, and the DM6000AR then measured **61.36 mA**. That subtraction was
+wrong by more than a factor of two, so do not use the USB meter's moving figures as the servo's.
+Likely reasons, not established: the module's draw is not constant while the servo moves, and the
+two meters sample differently. The DM6000AR's MAX mode still misses spikes shorter than its
+sample interval. **Stall: 459 mA peak**, about 7.5 times the free-sweep peak. Earlier attempts on the **400 mA port**
+overloaded it (display went open-circuit) before the reading was retaken on the 10 A port, which
+agrees: the stall is above 400 mA. Caveats: the lever was blocked by a hand, so a harder stall
+could read higher; the meter's MAX mode misses spikes shorter than its sample interval; and the
+5 V rail at the servo during the stall was not measured, so a sag would have lowered the figure.
+**That 400 mA port may now have a blown fuse** — check it before trusting it. Moving current at
+speed and on a linkage are still unmeasured.
+
+**The DM6000AR's 400 mA port is fused.** A stall can exceed it. For the stall reading, move the
+servo's red lead to the meter's 10 A port.
 
 **Signal level: 3.3 V works.** The servo followed the XIAO's 3.3 V pulse on D10 with no level
 shifter, at centre and through the sweep. So the jaw plan's "do not buy the SN74AHCT125N yet" holds.
-
-So a slow, unloaded move peaks at about **6 times the holding current**. A faster move, a load, or
-a stall will read higher, and **stall current is still unmeasured.** Nothing here was loaded.
 
 ## 6. What the listing does not say — still to measure
 
