@@ -246,3 +246,32 @@ depend on anyone's memory.
 5. What the linkage is, and what its real travel and load are. Depends on the animatronic.
 6. Naming: this repo is "LED Light Bar". A second prop type is the point at which that may stop
    being the right name. Not urgent.
+
+## 10. Several servos on one prop — design, 2026-11-14 (not built)
+
+A prop may carry more than one servo (a mouth, a head turn, a blink). The board stays ONE prop
+with one MAC and one link; each servo becomes a **channel** on it. Nothing in the design names
+a body part: the user types a **label**, and the system only knows two **modes**.
+
+| Setting per channel | Meaning |
+|---|---|
+| **Label** | free text ("Mouth", "Head", "Eyes"); shown on the Servo tab and in show steps |
+| **Mode** | **Follows Speech** or **Manual** |
+| Limits, smoothing | as the single servo has today (closed, swing, lo/hi, attack, release, slew) |
+| **Positions** (Manual only) | user-named positions, each with an angle, plus a travel speed |
+| **Move on its own** (Manual only, checkbox) | repeats between two chosen positions while the show runs: average gap, random variation |
+
+- **Follows Speech**: moves with the box's track. The word timestamps GATE the track (zero outside
+  a phrase); inside a phrase the level follows loudness. Unchanged from the one-servo jaw.
+- **Manual**: goes to a named position when a show step says so (`Yeti · Head → Right`), eased at
+  its travel speed. A blink is a Manual channel with two positions and "Move on its own" ticked;
+  a step can still send it to a position.
+- The agent sees prop, channel label and position names only. Never angles, never a body part.
+
+Risks to design for: a missed position message leaves the servo wrong (confirm each, or check the
+held position when the show ends); "Move on its own" must stop when a show is aborted; supply must
+cover several stalls (one S51 stalled at 459 mA).
+
+Order: channels in firmware → Manual positions → Move on its own → the box's Servo tab panels and
+two show steps (go to position, move on its own on/off). The wire command format is agreed with the
+box's agent before firmware is written.
