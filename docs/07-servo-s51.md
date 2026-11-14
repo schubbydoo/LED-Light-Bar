@@ -121,7 +121,8 @@ overloaded it (display went open-circuit) before the reading was retaken on the 
 agrees: the stall is above 400 mA. Caveats: the lever was blocked by a hand, so a harder stall
 could read higher; the meter's MAX mode misses spikes shorter than its sample interval; and the
 5 V rail at the servo during the stall was not measured, so a sag would have lowered the figure.
-**That 400 mA port may now have a blown fuse** — check it before trusting it. Moving current at
+**The 400 mA port was checked afterwards and still works**, so its open-circuit display was an
+overload of that range, not a blown fuse. Moving current at
 speed and on a linkage are still unmeasured.
 
 **The DM6000AR's 400 mA port is fused.** A stall can exceed it. For the stall reading, move the
