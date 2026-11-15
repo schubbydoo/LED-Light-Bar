@@ -10,7 +10,7 @@ Two sketches, two ends of one radio link, versioned together — see the note in
 | `pixelcheck/` | Whole-strip primaries and fixed markers, held. For when `bringup` raises a question about one pixel or one channel — it removes motion from the answer. |
 | `bar/` | The light bar — the ambience renderer. **Tunable live over serial.** |
 | `jawcheck/` | Steady hardware-timed servo pulse on D10, moved a little at a time over serial. For finding a servo's real limits on a real mechanism. |
-| `jaw/` | A servo mouth that speaks. **The bar's remote with the strip swapped for a servo** — same link, track, cue, persistence and command language. Written 2026-11-14, bench-tested only (no jaw, no radio, no real track). |
+| `jaw/` | The servo remote: **the bar's remote with the strip swapped for servos** — same link, track, cue, persistence and command language. One board drives up to 4 servos, each a speech-following mouth or a manually positioned channel. Written 2026-11-14; bench-tested with free levers, over the radio, and in a show with two servos. |
 | `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW, to one or more props. **Working for the bar; multi-prop addressing written 2026-11-12, not yet flashed.** |
 
 ---
@@ -62,9 +62,9 @@ The `@name` is stripped before the line goes out, so every prop understands the 
 Replies are tagged by who sent them: the bar's stay exactly as they were (`bar> ...`, `-> ok`),
 and any other prop is named (`jaw> ...`, `-> ok @jaw`).
 
-The prop table is `PEERS[]` near the top of `bridge/bridge.ino`, and **the jaw's MAC is not set**
-until its board exists — a line to it is refused with a clear message rather than sent at nobody.
-When the board arrives, put its MAC there, in `flash.sh` and in `send.sh`, and nowhere else.
+The prop table is `PEERS[]` near the top of `bridge/bridge.ino`. **The jaw's MAC is set**
+(`44:B1:76:5F:B4:28`), here, in `flash.sh` and in `send.sh`, and nowhere else. A prop whose MAC is
+unset is refused with a clear message rather than sent at nobody.
 
 **Bridge commands** (typed at the bridge, never forwarded): `.stats` delivery counts per prop ·
 `.peers` the table · `.mac` · `.gap` shows the pacing, `.gap 30` sets it.
@@ -375,8 +375,23 @@ Calibrate with the jaw mounted: `hold <deg>`, `open`, `close`, widening `loDeg`/
 degrees at a time while watching a power meter. A servo driven into a stop draws its stall
 current (459 mA measured, `docs/07-servo-s51.md`) until told to move.
 
-**Tested 2026-11-14, on the bench with a servo and a free lever:** commands, limits and persistence over
-serial; then, through the box's Jaw tab, a track pushed over the radio and cued from the player's
-real position, with two different sounds. It **looked** synchronized to the user. **Sync has not
-been measured** the way the bar's was (±55 ms), and no real jaw has been tried, so the swing,
-attack, release and slew defaults are still starting points for tuning by eye.
+### Several servos on one board
+
+One board is one prop; each servo is a **channel** (`channels <1..4>`, default 1). Channel 1 is on
+D10, channels 2..4 on D1, D2, D3. Un-prefixed commands mean channel 1, and the single-servo
+`show`/`st` lines are unchanged, so a box that knows one servo keeps working.
+
+A channel's **mode** is `speech` (follows the box's track) or `manual` (goes to a numbered position
+slot with `go <ch> <slot>`, and with `auto <ch> on` repeats between two slots on its own, which is
+how a blink works). Names and labels live on the box; the wire carries channel and slot numbers.
+`stop` releases the track only; `stop all` also ends every `auto`; `auto` lapses after 120 s unless
+repeated. The full command set and reply shapes are in `docs/06-jaw-plan.md` §10 and the header of
+`jaw/jaw.ino`.
+
+**Tested 2026-11-14/15.** On the bench with free levers: commands, limits and persistence over
+serial; a track pushed over the radio and cued from the player's real position with two different
+sounds (it **looked** synchronized); a second servo on channel 2, with slots, `go` and `auto`;
+multi-line `st` replies over the radio; and a real show with both servos, which the user reports
+worked perfectly. **Sync has not been measured** the way the bar's was (±55 ms), no real jaw has
+been tried, and speech on two servos at once is untested, so the swing, attack, release and slew
+defaults are still starting points for tuning by eye.

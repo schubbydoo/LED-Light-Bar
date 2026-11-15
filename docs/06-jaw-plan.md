@@ -1,8 +1,9 @@
 # Speech-driven jaw — plan
 
-Date: 2026-11-12 · **Status 2026-11-14: phases 1–4 done on the bench, phase 5 started.** The bench
+Date: 2026-11-12 · **Status 2026-11-15: phases 1–4 done on the bench, phase 5 under way, and the board now drives several servos (§10, built).** The bench
 servo is measured (`docs/07-servo-s51.md`), `firmware/jaw/` runs, and two different sounds were
-pushed over the radio and cued from the box, with the jaw judged by eye to move in time. Not yet
+pushed over the radio and cued from the box, with the jaw judged by eye to move in time, and a
+real show with two servos has run on the box. Not yet
 done: a real jaw mechanism, sync measured as the bar's was, the bar and jaw speaking at once, and
 `firmware/common/`. The sections below are the plan as first written.
 
@@ -247,7 +248,7 @@ depend on anyone's memory.
 6. Naming: this repo is "LED Light Bar". A second prop type is the point at which that may stop
    being the right name. Not urgent.
 
-## 10. Several servos on one prop — design, 2026-11-14 (not built)
+## 10. Several servos on one prop — designed and built 2026-11-14 (`firmware/jaw/jaw.ino`)
 
 A prop may carry more than one servo (a mouth, a head turn, a blink). The board stays ONE prop
 with one MAC and one link; each servo becomes a **channel** on it. Nothing in the design names
