@@ -91,3 +91,41 @@ cap is raised from 4. D6/D7 are the UART pins.
   some batteries cut off at low current. Not measured.
 - The converter's behaviour under a four-servo stall, and the bus voltage at the servos then.
 - Real runtime on the battery.
+
+---
+
+## 6. Parts list
+
+**Inventory:** no personal inventory file turned up under `/home/shschubert`. The "On hand?" column
+uses only what two project files say: **OWNED** is from the SFX Box BOM
+(`SFX box/reference/sfx-box-bom-v3.xlsx`), **[bin?]** is `docs/05-parts.md`'s own guess, and
+**?** means no file says. Check it against your shelf.
+
+**Part numbers are from memory and are suggestions. Check each against its datasheet or listing
+before ordering.**
+
+| # | Part | Part number / spec | Qty | On hand? | Notes |
+|---|---|---|---|---|---|
+| 1 | Controller | Seeed XIAO ESP32C3 (SKU 113991054) | 1 | **yes** (2 per `05-parts.md`; one is the bar) | the jaw board already runs `jaw.ino` |
+| 2 | 5 V buck converter | **MP1584EN module** (the EBOOT 6-pack) | 1 | **OWNED** (SFX BOM) | set to 5.0 V *before* connecting anything. Fine for a typical show. Marginal for four servos stalling at once (~1.9 A): these are rated 3 A peak but run hot near that |
+| 2b | *or* a stronger buck | Pololu D36V28F5, 5 V 3.2 A step-down, 6–50 V in (Pololu #3782) | 1 | ? | the safe choice if you want the all-stalled worst case covered |
+| 3 | Schottky, XIAO 5V feed | 1N5819 (DO-41) | 1 | ? (bar board uses one) | Seeed requires it on the 5V pin |
+| 4 | Reverse-polarity diode | 1N5822 (3 A, 40 V) or SS54 | 1 | ? | in series at the 12 V input; costs ~0.4 V, harmless into a buck |
+| 5 | TVS diode | SMBJ15A | 1 | ? | across the 12 V input, after the fuse |
+| 6 | Resettable fuse | Bourns MF-R200 (2 A hold) | 1 | ? | on the 12 V input. Check its voltage rating against the 12.6 V battery |
+| 7 | Bulk cap, servo bus | 1000 µF, 16 V electrolytic | 1 | **[bin?]** | at the buck output; 470 µF also acceptable |
+| 8 | Input cap | 100 µF, 25 V electrolytic | 1 | ? | at the buck input |
+| 9 | XIAO feed cap | 10–47 µF, 10 V | 1 | ? | at the XIAO 5V pin |
+| 10 | Ceramic caps | 100 nF, 50 V | 5 | ? | one across each servo header's + and GND, one at the XIAO |
+| 11 | Signal pull-downs | 10 kΩ, 1/4 W | 4 | **[bin?]** | one per signal pin, to GND |
+| 12 | Signal series resistors (optional) | 100–330 Ω, 1/4 W | 4 | **[bin?]** | optional protection |
+| 13 | Servo headers | 3-pin 2.54 mm male header (break from a 40-pin strip) | 4 | ? | signal, +5 V, GND, in the S51's own order |
+| 14 | XIAO sockets | 7-pin 2.54 mm female header | 2 | ? | so the XIAO can be removed and reflashed |
+| 15 | Power input | 5.5 × 2.1 mm barrel jack, panel or PCB mount, plus a 2-pin 5.08 mm screw terminal | 1 each | **OWNED** (barrel jacks and screw terminals, SFX BOM) | **meter the brick's polarity**; centre-positive is common, not universal |
+| 16 | Board | perfboard, the size used for the bar | 1 | ? | |
+| 17 | Wire | 20 AWG for the power bus, 22 AWG silicone for signals | — | **[bin?]** (22 AWG) | |
+| 18 | Servos | Smraza S51, 9 g | 2–4 | **yes** (2 on the bench) | |
+| 19 | Motion sensor (optional) | HC-SR501 PIR or VL53L1X ToF | 1 | **OWNED** (VL53L1X, SFX BOM); HC-SR501 listed as optional stock | the box handles triggers today; this is only for a standalone board |
+| 20 | 12 V sources | 12 V brick (5.5 × 2.1 mm) · TalentCell YB1206000 12 V battery | 1 each | **yes** (TalentCell, `05-parts.md`); the brick **OWNED** per the SFX BOM | the box's 12 V PSU is the same class of brick |
+
+**Not a part, but needed:** a DMM for the first-power checks in §4 (you have the DM6000AR).
