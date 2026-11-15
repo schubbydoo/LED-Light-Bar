@@ -150,3 +150,42 @@ shifter, at centre and through the sweep. So the jaw plan's "do not buy the SN74
   datasheet allows it.
 - Signal on **D10**, with a 10 kΩ pull-down so it does not twitch while the XIAO boots.
 - Power does not come from the XIAO or the SFX Box's USB.
+
+## 8. Plugging a servo into the light bar's JST — adapter wire table (not built)
+
+The bar's pod has one 3-pin JST SM going out to the strip (`docs/03-perfboard-layout.md`). It
+carries the three things a servo needs, so one servo can run from it with a short adapter. **The
+pin ORDER differs, so a servo plug cannot be pushed into the JST directly:** a servo has +V in the
+MIDDLE, the JST has the signal in the middle. Wired straight through, 5 V would land on the
+servo's signal wire and the signal on its power.
+
+| JST SM pin (bar side) | Bar wire | Carries | Adapter | Servo wire (S51) | Servo plug position |
+|---|---|---|---|---|---|
+| 1 | brown | +5 V, from the star point, 1000 µF beside it | → | **red** | middle |
+| 2 | green | D10, buffered to 5 V logic, through 470 Ω | → | **orange** (signal) | end |
+| 3 | white | GND | → | **brown** | other end |
+
+So the adapter CROSSES two wires: JST pin 2 (signal) goes to the servo's END pin and JST pin 1
+(+5 V) to its MIDDLE pin. A JST SM plug on one end, a 3-pin 0.1" female servo-style housing on
+the other.
+
+**Before the first power-up** (the strip's wires did not match its manual, and 5 V on the signal
+pad kills a pixel; a servo is more forgiving but the meter costs two minutes):
+1. The doc's JST pin order is a *working assumption*. Confirm which pad each JST wire reaches
+   against the silkscreen (`+5V`, `DIN`, `GND`) with the meter in continuity mode.
+2. Continuity: adapter red ↔ the JST wire that reaches `+5V`; adapter orange ↔ `DIN`; adapter
+   brown ↔ `GND`. No continuity between any two of the three.
+3. Power the bar with the servo NOT plugged in and check, at the adapter's JST plug, +5 V on the
+   +5 V wire, 0 V on GND, and (with `jaw.ino` running) a pulse on the signal wire if you have a scope.
+4. Only then plug the servo in.
+
+Why it works, in the docs' own figures (not tested): the servo pulse comes from the same D10, via
+the AHCT125, so it arrives as a clean 5 V pulse; the 470 Ω in series is harmless because a servo's
+signal input draws almost nothing; the supply and the 1000 µF at the connector cover the S51
+(459 mA stalled against the 144-pixel strip's ~0.8 A).
+
+**Only one device on that connector at a time, and the matching firmware.** The bar board runs
+`bar.ino` (strip data); a servo needs `jaw.ino`. With `bar.ino` running a servo jitters; with
+`jaw.ino` running a strip flickers. Neither is damaged, but do not leave the wrong one plugged in.
+The bridge also knows a board by its radio address, so decide which prop that board stands for.
+One servo per connector, on channel 1 (D10); channels 2..4 are on other pins the JST does not reach.
