@@ -195,9 +195,9 @@ of the XIAO and the sensor pins D7 and D10 are on the left. The sensor circuit f
 one for D10 in the right island, as mirror images, so the two blocks are built the same way and each collector wire is
 short. Rotate the whole board 180° in the box if the USB end should face elsewhere.
 
-**XIAO position:** left pins in column 3 of the left island, right pins in column 3 of the right island (columns
-1–5 left, 6–7 middle, 8–12 right, so these are columns 3 and 10), rows 11–17. Columns 1–2 and 11–12 stay free beside
-the pins. The sensor blocks sit above it in rows 3–8.
+**XIAO position:** the XIAO is 7 columns wide. Its left pins are in column 3 of the left island and its right pins in column 9 (columns
+1–5 left, 6–7 middle, 8–12 right), rows 11–17. That leaves **two free holes on the left** (columns 1–2) and **three on
+the right** (columns 10–12). The sensor blocks sit above it in rows 3–8.
 
 | Rows | Left pin | Right pin |
 |---|---|---|
@@ -262,7 +262,7 @@ The sleeve of each jack has no wire on this board: it goes to GND on the connect
 | 1N5819 (band to the XIAO; bend the leads to 0.3") | cathode left row 17, col 2 | anode left row 20, col 2 |
 | Anode jumper | left row 20, col 1 | left A, row 20 |
 | 100 µF (+ to row 17) and 100 nF, side by side | left row 17, col 1 | left row 16, col 1 |
-| Tags `S1`, `S2`, `S3`, `S4` | right rows 16 / 15 / 14 / 13, col 11 | |
+| Tags `S1`, `S2`, `S3`, `S4` | right rows 16 / 15 / 14 / 13, col 10 | |
 
 **Wires between the two boards (10 plus the 12 V pair).** `S1`–`S4`, `J1.T`, `J1.R`, `J2.T`, `J2.R`, and one
 `+5V` and one `GND` (20 AWG, they carry every servo's current). `12V+` and `12V−` go from the jack to the 12 V chain
