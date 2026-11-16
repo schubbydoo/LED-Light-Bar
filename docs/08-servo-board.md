@@ -198,17 +198,16 @@ are free across both halves.
 
 ### Hole list (row, side-column; `L`/`R` = left/right half, rail = `L5 LG R5 RG`)
 
-**Power, rows 1–3 and the bridges**
+**12 V side, off the board.** The 12 V parts sit above the buck module and the 5 V side below it, so the
+buck is the only thing between them: barrel jack + → PTC fuse → 1N5822 (band toward the buck) → buck IN+,
+with the 100 µF 25 V and the TVS (P6KE15A, band to +) from that node to GND, and jack GND → buck IN−. Build
+it on the buck's own bit of board or wire it point to point. Nothing from this chain goes on the SB400 board.
+
+**5 V side, on the board** (rows 1–3 are now spare)
 
 | Part | From | To |
 |---|---|---|
-| 12 V from the barrel jack | wire to L row 1, col 1 | jack GND to LG rail, row 2 |
-| PTC fuse | L1 col 2 | L3 col 2 |
-| 1N5822 (band to the right) | anode L3 col 4 | cathode R3 col 9 |
-| 100 µF 25 V (+ to the row) | R3 col 12 | RG rail row 3 |
-| Buck IN+ / IN− | wire from R3 | wire from RG rail row 2 |
-| Buck OUT+ / OUT− | to L5 rail row 1 | to LG rail row 2 |
-| TVS (P6KE15A, band to +) | across the buck module's IN+ and IN− pads, not on the board | |
+| Buck OUT+ / OUT− | L5 rail row 1 | LG rail row 2 |
 | Bridge GND | LG row 13 | RG row 13 |
 | Bridge +5 V | L5 row 14 | R5 row 14 |
 | 1000 µF 10 V+ (+ to outer rail) | R5 rail row 26 | RG rail row 26 |
@@ -244,8 +243,7 @@ Values below are for port 1; add 5 rows for port 2.
 | Servos 2, 3, 4: signal | R21 col 11 / R20 col 11 / R19 col 11 | |
 | Servos 2, 3, 4: + / − | R5 rail / RG rail, same row as the signal | |
 
-**Soldering order that keeps things reachable:** rails and bridge wires, then power-chain parts at the top,
-then the two sensor circuits, then the diode and caps beside the XIAO, then the XIAO last (it covers the
+**Soldering order that keeps things reachable:** rails and bridge wires, then the two sensor circuits, then the diode and caps beside the XIAO, then the XIAO last (it covers the
 holes under it). Meter each rail for continuity to the far end, and meter across the channel on a spare row
 to confirm the halves are isolated, before the XIAO goes in.
 
