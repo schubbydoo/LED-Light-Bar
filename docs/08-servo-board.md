@@ -10,6 +10,10 @@ is available, and makes its own 5 V.
 
 ---
 
+![Servo board wiring](../images/servo-board.png)
+
+*`../images/servo-board.svg` is the source. Pin order on the XIAO is simplified; use its silkscreen.*
+
 ## 1. Power budget
 
 | Load | At 5 V | Basis |
@@ -74,8 +78,8 @@ One **3-pin 0.1" male header per servo**, in the S51's own order so the servo pl
 3.3 V signals drive the S51 directly (measured); no level shifter. A 100–330 Ω series resistor on
 each signal is optional protection. Add a **100 nF cap across each header's + and GND**.
 
-Spare pins: D4, D5 (GPIO6, 7) are free for a motion sensor or two more servos if the firmware
-cap is raised from 4. D6/D7 are the UART pins.
+D4 and D5 (GPIO6, 7) are the two sensor inputs (§7). D6/D7 are the UART pins and are left unused:
+the chip prints boot messages on one of them.
 
 ## 4. Before first power
 
@@ -126,6 +130,36 @@ before ordering.**
 | 17 | Wire | 20 AWG for the power bus, 22 AWG silicone for signals | — | **[bin?]** (22 AWG) | |
 | 18 | Servos | Smraza S51, 9 g | 2–4 | **yes** (2 on the bench) | |
 | 19 | Motion sensor (optional) | HC-SR501 PIR or VL53L1X ToF | 1 | **OWNED** (VL53L1X, SFX BOM); HC-SR501 listed as optional stock | the box handles triggers today; this is only for a standalone board |
+| 19b | Sensor port parts (×2) | 3.5 mm stereo jack, 2N3904, 1 kΩ, 100 kΩ, 22 Ω, 4.7 µF, 100 nF | 2 sets | **?** (the SFX Box's ports use the same parts) | see §7 |
 | 20 | 12 V sources | 12 V brick (5.5 × 2.1 mm) · TalentCell YB1206000 12 V battery | 1 each | **yes** (TalentCell, `05-parts.md`); the brick **OWNED** per the SFX BOM | the box's 12 V PSU is the same class of brick |
 
 **Not a part, but needed:** a DMM for the first-power checks in §4 (you have the DM6000AR).
+
+---
+
+## 7. Two sensor ports (D4, D5)
+
+Same port as the SFX Box's (`SFX box/sfx-box-wiring.md`, "Sensor daughter board"), so the same
+sensor plugs into either: **3.5 mm stereo jack, Tip = +5 V, Ring = signal, Sleeve = GND.** A Neumi
+motion sensor (3.3 V output on motion) or a plain push button wired Ring to Tip both work.
+
+Per port: the 22 Ω from the 5 V bus feeds Tip (absorbing the momentary short as a plug seats,
+with 4.7 µF + 100 nF at that node); Ring goes through 1 kΩ to the base of an NPN (2N3904), with
+100 kΩ from the base to GND; the emitter is GND; the collector goes to the XIAO pin, whose
+**internal pull-up** is on. The stage level-shifts and **inverts: motion pulls the pin LOW.**
+
+**Firmware:** `firmware/jaw/jaw.ino` debounces both inputs (30 ms) and announces each change
+unasked over the radio:
+
+    ev sensor <n> <0|1> <seq>        1 = active (pin LOW), 0 = released
+
+Each event goes out 3 times, 40 ms apart, with the same `seq`; the receiver ignores a repeat of
+the same (n, state, seq). The bridge needs no change: it already prints anything a prop says,
+tagged `jaw>`. `sens` reads the two inputs back (`sens 1=0 2=0`) and `st` carries `sens=00`.
+**Not done:** the SFX Box does not yet read unsolicited `ev` lines or offer them as triggers.
+
+Bench test without the circuit: the pins idle HIGH, so touching a wire from D4 or D5 to GND
+looks like motion.
+
+Parts for the two ports (copied from the SFX Box's list, per port): 1 × 3.5 mm stereo jack, 1 ×
+2N3904 (MMBT3904 or BC547 also work), 1 × 1 kΩ, 1 × 100 kΩ, 1 × 22 Ω, 1 × 4.7 µF, 1 × 100 nF.

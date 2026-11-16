@@ -78,7 +78,22 @@
   `auto on` is a DEAD-MAN: it expires after 120 s unless repeated. It is RAM-only
   and off at boot, so a box that crashes mid-show cannot leave a servo moving.
 
-  Pins: D10 (GPIO10), D1..D3. Never D0, D8 or D9 — see CLAUDE.md, strapping pins.
+  TWO ON/OFF SENSOR PORTS
+
+  D4 and D5 (GPIO6, GPIO7) are inputs with the internal pull-up, wired like the SFX
+  Box's sensor ports: a transistor stage that INVERTS, so motion pulls the pin LOW.
+  A debounced change is announced over the radio, unasked:
+
+      ev sensor <n> <0|1> <seq>        n = 1..2; 1 = active (pin LOW), 0 = released
+
+  Each event is sent 3 times, 40 ms apart, because a radio frame can be lost and a
+  missed trigger is worse than a repeated one. The copies carry the SAME seq; the
+  receiver ignores a repeat of (n, state, seq). seq counts up from 0 at each boot.
+  The bridge already forwards anything a prop says, tagged `jaw>`. `sens` reads the
+  two inputs back: `sens 1=<0|1> 2=<0|1>`, and `st` carries `sens=<n1><n2>`.
+
+  Pins: D10 (GPIO10), D1..D3 servos; D4, D5 sensors. Never D0, D8 or D9 — see
+  CLAUDE.md, strapping pins.
 */
 
 #include <Preferences.h>
@@ -630,6 +645,65 @@ static void render(int i, float dt) {
 }
 
 // ---------------------------------------------------------------------------
+// Sensors: two on/off inputs, active LOW (the port's transistor stage inverts).
+// ---------------------------------------------------------------------------
+static const int      N_SENSORS = 2;
+static const int      SENSOR_PINS[N_SENSORS] = {D4, D5};       // GPIO6, GPIO7
+static const uint32_t SENSOR_DEBOUNCE_MS = 30;
+static const uint8_t  EV_REPEATS = 3;
+static const uint32_t EV_REPEAT_GAP_MS = 40;
+
+static bool     sensState[N_SENSORS];                          // debounced, true = active
+static bool     sensRaw[N_SENSORS];
+static uint32_t sensChangedAt[N_SENSORS];
+static uint16_t evSeq = 0;
+
+struct PendingEv { String line; uint8_t left = 0; uint32_t nextAt = 0; };
+static PendingEv pendingEv[N_SENSORS * 2];                     // a few can be in flight at once
+
+static void sensorsBegin() {
+  for (int i = 0; i < N_SENSORS; i++) {
+    pinMode(SENSOR_PINS[i], INPUT_PULLUP);
+    sensRaw[i] = sensState[i] = (digitalRead(SENSOR_PINS[i]) == LOW);
+    sensChangedAt[i] = millis();
+  }
+}
+
+static void announce(int i, bool active) {
+  String line = "ev sensor " + String(i + 1) + " " + (active ? "1" : "0") + " " + String(evSeq++);
+  Serial.println(line);
+  for (auto& e : pendingEv) {
+    if (e.left) continue;
+    e.line = line; e.left = EV_REPEATS; e.nextAt = millis();
+    return;
+  }
+}
+
+static void sensorsPoll() {
+  uint32_t now = millis();
+  for (int i = 0; i < N_SENSORS; i++) {
+    bool raw = (digitalRead(SENSOR_PINS[i]) == LOW);
+    if (raw != sensRaw[i]) { sensRaw[i] = raw; sensChangedAt[i] = now; }
+    if (raw != sensState[i] && now - sensChangedAt[i] >= SENSOR_DEBOUNCE_MS) {
+      sensState[i] = raw;
+      announce(i, raw);
+    }
+  }
+  for (auto& e : pendingEv) {
+    if (!e.left || (int32_t)(now - e.nextAt) < 0) continue;
+    linkSend(e.line);
+    e.left--;
+    e.nextAt = now + EV_REPEAT_GAP_MS;
+  }
+}
+
+static String sensString() {
+  String o;
+  for (int i = 0; i < N_SENSORS; i++) o += sensState[i] ? "1" : "0";
+  return o;
+}
+
+// ---------------------------------------------------------------------------
 // Commands.
 // ---------------------------------------------------------------------------
 
@@ -717,7 +791,7 @@ static void handleLine(String line) {
   if (verb == "st") {
     Chan& c = C[0];
     float openD = c.p.closedDeg + c.p.dir * c.p.swingDeg;
-    String out = "st dev=jaw channels=" + String(nch) + " closed=" + String(c.p.closedDeg, 1)
+    String out = "st dev=jaw channels=" + String(nch) + " sens=" + sensString() + " closed=" + String(c.p.closedDeg, 1)
                + " swing=" + String(c.p.swingDeg, 1)
                + " dir=" + String((int)c.p.dir)
                + " open=" + String(openD, 1)
@@ -745,6 +819,13 @@ static void handleLine(String line) {
     return;
   }
 
+  if (verb == "sens") {
+    String o = "sens";
+    for (int i = 0; i < N_SENSORS; i++) o += " " + String(i + 1) + "=" + (sensState[i] ? "1" : "0");
+    reply(o);
+    return;
+  }
+
   if (verb == "save") {
     saveParams();
     String m = "saved params" + String(trackFrames ? " (track already on flash)" : "");
@@ -766,6 +847,7 @@ static void handleLine(String line) {
     Serial.println(F("st                      state: header (channel 1) then one line per channel"));
     Serial.println(F("set [<ch>.]<key> <v>    change a setting (see show for keys)"));
     Serial.println(F("save | forget           keep settings across power cycles | back to defaults"));
+    Serial.println(F("sens                    the two sensor inputs (1 = active, pin LOW)"));
     Serial.println(F("channels <1..4>         how many servos this board drives"));
     Serial.println(F("mode <ch> speech|manual   slot <ch> <n> <deg> <speed>|clear"));
     Serial.println(F("go <ch> <n>             go to position slot n   auto <ch> on|off"));
@@ -1069,6 +1151,8 @@ void setup() {
     writeAngle(i, C[i].angle);
   }
 
+  sensorsBegin();
+
   fsReady = LittleFS.begin(true);
   bool restored = loadTrack();
   linkBegin();
@@ -1093,6 +1177,7 @@ void setup() {
 void loop() {
   static uint32_t lastUs = micros();
   pollSerial();
+  sensorsPoll();
   pumpTx();
 
   if (rxPending) {
