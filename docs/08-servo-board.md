@@ -36,9 +36,9 @@ is available, and makes its own 5 V.
    │
    ├─ fuse (~2 A, resettable) ─ reverse-polarity protection ─ TVS across the input
    │
-   └─ 5 V buck converter, >= 3 A ──┬── servo bus: 470–1000 µF bulk cap ──> 4 servo headers (+)
+   └─ 5 V buck converter, >= 3 A ──┬── servo bus: 470–1000 µF bulk cap (the only cap on the servo side) ──> 4 servo headers (+)
                                    │
-                                   └── Schottky (1N5819) ── XIAO 5V pin (+ 10–47 µF at the pin)
+                                   └── Schottky (1N5819) ── XIAO 5V pin (+ 100 µF at the pin)
 
  GND: one star point. Servo ground returns and the XIAO GND meet there; the buck's GND too.
 ```
@@ -63,7 +63,7 @@ One **3-pin 0.1" male header per servo**, in the S51's own order so the servo pl
 
 | Header pin | Wire (S51) | Goes to |
 |---|---|---|
-| 1 | orange, signal | XIAO pin (table below), 10 kΩ to GND |
+| 1 | orange, signal | XIAO pin (table below), nothing else on the line |
 | 2 | red, +5 V | the servo bus (after the bulk cap) |
 | 3 | brown, GND | the GND star point |
 
@@ -76,7 +76,7 @@ One **3-pin 0.1" male header per servo**, in the S51's own order so the servo pl
 | *never* | D0, D8, D9 | GPIO2, 8, 9 — strapping, see CLAUDE.md |
 
 3.3 V signals drive the S51 directly (measured); no level shifter. A 100–330 Ω series resistor on
-each signal is optional protection. Add a **100 nF cap across each header's + and GND**.
+each signal is optional protection. There are **no per-servo pull-downs or caps**: the pull-downs did not stop the boot twitch when tried, and the one bulk cap serves all four servos.
 
 D4 and D5 (GPIO6, 7) are the two sensor inputs (§7). D6/D7 are the UART pins and are left unused:
 the chip prints boot messages on one of them.
@@ -119,9 +119,9 @@ before ordering.**
 | 6 | Resettable fuse | Bourns MF-R200 (2 A hold) | 1 | ? | on the 12 V input. Check its voltage rating against the 12.6 V battery |
 | 7 | Bulk cap, servo bus | 1000 µF, 16 V electrolytic | 1 | **[bin?]** | at the buck output; 470 µF also acceptable |
 | 8 | Input cap | 100 µF, 25 V electrolytic | 1 | ? | at the buck input |
-| 9 | XIAO feed cap | 10–47 µF, 10 V | 1 | ? | at the XIAO 5V pin |
-| 10 | Ceramic caps | 100 nF, 50 V | 5 | ? | one across each servo header's + and GND, one at the XIAO |
-| 11 | Signal pull-downs | 10 kΩ, 1/4 W | 4 | **[bin?]** | one per signal pin, to GND |
+| 9 | XIAO feed cap | 100 µF, 10 V or higher | 1 | ? | at the XIAO 5V pin, after the Schottky; it only has to carry the XIAO (~100 mA, radio bursts higher) through short dips |
+| 10 | Ceramic cap | 100 nF, 50 V | 1 | ? | one at the XIAO 5V pin |
+| 11 | *(removed: signal pull-downs)* | | 0 | | not needed |
 | 12 | Signal series resistors (optional) | 100–330 Ω, 1/4 W | 4 | **[bin?]** | optional protection |
 | 13 | Servo headers | 3-pin 2.54 mm male header (break from a 40-pin strip) | 4 | ? | signal, +5 V, GND, in the S51's own order |
 | 14 | XIAO sockets | 7-pin 2.54 mm female header | 2 | ? | so the XIAO can be removed and reflashed |
