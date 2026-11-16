@@ -163,3 +163,90 @@ looks like motion.
 
 Parts for the two ports (copied from the SFX Box's list, per port): 1 × 3.5 mm stereo jack, 1 ×
 2N3904 (MMBT3904 or BC547 also work), 1 × 1 kΩ, 1 × 100 kΩ, 1 × 22 Ω, 1 × 4.7 µF, 1 × 100 nF.
+
+## 8. Layout on the SB400-style board
+
+![Board layout](../images/servo-board-layout.png)
+
+**What I assumed from the photo of the light-bar board** (count against your own board before soldering;
+the layout is relative to the XIAO, so a column or two of difference only shifts things):
+
+- Two vertical rail strips on each side. Rows run left-right and are **cut at the centre channel**, so every
+  row is two separate nets: the left half (columns 1–6) and the right half (columns 7–12). A part that
+  straddles the channel (like the diode in your photo) joins the two halves.
+- About 28 rows. Rows are numbered from the top in the drawing.
+- Rails: **inner strip (next to the holes) = GND, outer strip = +5 V**, on both sides.
+
+**Why the XIAO is turned so the USB end points at the bottom:** the signal pins D1–D5 then land on the right
+half, next to the right rail, with free holes beside each pin. D10, 5V and GND land on the left half next to
+the left rail. Rotate the whole board 180° in the box if the USB end should face elsewhere; the design is
+mirror-symmetric in what it needs.
+
+**XIAO position:** left pins in left-half column 3, right pins in right-half column 10, rows 16–22. Holes
+at left columns 1–2 and right columns 11–12 stay free beside the pins. Rows above row 15 and below row 23
+are free across both halves.
+
+| Rows | Left pin | Right pin |
+|---|---|---|
+| 16 | D7 (unused) | D6 (unused) |
+| 17 | D8 (avoid) | **D5** sensor 2 |
+| 18 | D9 (avoid) | **D4** sensor 1 |
+| 19 | **D10** servo 1 | **D3** servo 4 |
+| 20 | 3V3 (unused) | **D2** servo 3 |
+| 21 | GND | **D1** servo 2 |
+| 22 | 5V | D0 (avoid) |
+
+### Hole list (row, side-column; `L`/`R` = left/right half, rail = `L5 LG R5 RG`)
+
+**Power, rows 1–3 and the bridges**
+
+| Part | From | To |
+|---|---|---|
+| 12 V from the barrel jack | wire to L row 1, col 1 | jack GND to LG rail, row 2 |
+| PTC fuse | L1 col 2 | L3 col 2 |
+| 1N5822 (band to the right) | anode L3 col 4 | cathode R3 col 9 |
+| 100 µF 25 V (+ to the row) | R3 col 12 | RG rail row 3 |
+| Buck IN+ / IN− | wire from R3 | wire from RG rail row 2 |
+| Buck OUT+ / OUT− | to L5 rail row 1 | to LG rail row 2 |
+| TVS (P6KE15A, band to +) | across the buck module's IN+ and IN− pads, not on the board | |
+| Bridge GND | LG row 13 | RG row 13 |
+| Bridge +5 V | L5 row 14 | R5 row 14 |
+| 1000 µF 10 V+ (+ to outer rail) | R5 rail row 26 | RG rail row 26 |
+
+Bridge the rails with wire, not just the strips: four stalled servos draw about 1.9 A.
+
+**Sensor ports.** Same circuit twice. Port 1 uses rows 4–6 (base row 5); port 2 uses rows 9–11 (base row 10).
+Values below are for port 1; add 5 rows for port 2.
+
+| Part | From | To |
+|---|---|---|
+| 22 Ω | L5 rail row 3 | L4 col 2 |
+| 4.7 µF (+ to the row) | L4 col 1 | LG rail row 4 |
+| 100 nF | L4 col 1 | LG rail row 5 |
+| Jack tip wire | L4 col 4 | |
+| Jack ring wire | L5 col 4 | |
+| Jack sleeve wire | LG rail row 6 | |
+| 1 kΩ (straddles the channel) | L5 col 5 | R5 col 8 |
+| 2N3904, flat face toward the left, standing in right col 9 | emitter R4, base R5, collector R6 | |
+| Emitter jumper | R4 col 10 | RG rail row 4 |
+| 100 kΩ | R5 col 10 | RG rail row 5 |
+| Collector wire (insulated, around the outside of the rails) | R6 col 10 | **D4** at R18 col 11 (port 2: R11 col 10 to **D5** at R17 col 11) |
+
+**XIAO power and servos**
+
+| Part | From | To |
+|---|---|---|
+| GND jumper | L21 col 2 | LG rail row 21 |
+| 1N5819 (band to the XIAO) | cathode L22 col 2 | anode L26 col 2 |
+| Anode jumper | L26 col 1 | L5 rail row 26 |
+| 100 µF (+ to row 22) and 100 nF | L22 col 1 | L21 col 1 |
+| Servo 1: signal / + / − | L19 col 2 / L5 rail row 19 / LG rail row 19 | |
+| Servos 2, 3, 4: signal | R21 col 11 / R20 col 11 / R19 col 11 | |
+| Servos 2, 3, 4: + / − | R5 rail / RG rail, same row as the signal | |
+
+**Soldering order that keeps things reachable:** rails and bridge wires, then power-chain parts at the top,
+then the two sensor circuits, then the diode and caps beside the XIAO, then the XIAO last (it covers the
+holes under it). Meter each rail for continuity to the far end, and meter across the channel on a spare row
+to confirm the halves are isolated, before the XIAO goes in.
+
+**Keep the buck module off the board, a few cm from the XIAO.** Its inductor is the noisiest thing in the box.
