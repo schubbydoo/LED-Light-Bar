@@ -169,6 +169,11 @@ Parts for the two ports (copied from the SFX Box's list, per port): 1 × 3.5 mm 
 
 ![Board layout](../images/servo-board-layout.png)
 
+**The connectors are on a second board** (`images/servo-board-connectors.png`), the one that mounts in the box wall. Every
+rounded tag in the layout (`12V+`, `J1.T`, `S1`, `+5V` and so on) is a wire to the tag of the same name there.
+
+![Connector board](../images/servo-board-connectors.png)
+
 **What I assumed from the photo of the light-bar board** (count against your own board before soldering;
 the layout is relative to the XIAO, so a column or two of difference only shifts things):
 
@@ -178,11 +183,10 @@ the layout is relative to the XIAO, so a column or two of difference only shifts
 - About 28 rows. Rows are numbered from the top in the drawing.
 - Rails: **inner strip (next to the holes) = GND, outer strip = +5 V**, on both sides.
 
-**Why the XIAO is turned so the USB end points at the bottom:** the four servo pins D1–D4 are on one edge of
-the XIAO and the two sensor pins D7 and D10 are on the other. Turned this way the servos land on the right
-half, beside the right rail, and the sensor circuits and jacks sit on the left half beside the left rail, so
-each side of the box has one kind of connector. Rotate the whole board 180° in the box if the USB end should
-face elsewhere; the design is mirror-symmetric in what it needs.
+**Why the XIAO is turned so the USB end points at the bottom:** the four servo pins D1–D4 are on the right edge
+of the XIAO and the sensor pins D7 and D10 are on the left. The sensor circuit for D7 sits in the left half and the
+one for D10 in the right half, as mirror images, so the two blocks are built the same way and each collector wire is
+short. Rotate the whole board 180° in the box if the USB end should face elsewhere.
 
 **XIAO position:** left pins in left-half column 3, right pins in right-half column 10, rows 16–22. Holes
 at left columns 1–2 and right columns 11–12 stay free beside the pins. Rows above row 15 and below row 23
@@ -205,7 +209,7 @@ buck is the only thing between them: barrel jack + → PTC fuse → 1N5822 (band
 with the 100 µF 25 V and the TVS (P6KE15A, band to +) from that node to GND, and jack GND → buck IN−. Build
 it on the buck's own bit of board or wire it point to point. Nothing from this chain goes on the SB400 board.
 
-**5 V side, on the board** (rows 1–2 are spare)
+**5 V side, on the board** (rows 1–6 are spare)
 
 | Part | From | To |
 |---|---|---|
@@ -216,23 +220,26 @@ it on the buck's own bit of board or wire it point to point. Nothing from this c
 
 Bridge the rails with wire, not just the strips: four stalled servos draw about 1.9 A.
 
-**Sensor ports, all on the left half.** Same circuit twice. Port 1 uses rows 3–8 and goes to **D7**; port 2 uses
-rows 9–14 and goes to **D10**. Values below are for port 1; add 6 rows for port 2 (tip row 9, ring row 10, and so on).
+**Sensor circuits (two mirror-image blocks, rows 7–11).** The left block serves sensor 1 and goes to **D7**; the
+right block serves sensor 2 and goes to **D10**. Columns are counted from the block's own rail: "k1" is the hole
+next to the rail, k6 the hole nearest the channel. The rail is the inner (GND) and outer (+5 V) pair on that side.
+Rows are relative to the top of the block: **7 tip, 8 GND, 9 base, 10 collector, 11 ring.**
 
 | Part | From | To |
 |---|---|---|
-| 22 Ω | L5 rail row 4 | L row 3, col 2 |
-| 4.7 µF (+ to the row) | L3 col 1 | LG rail row 3 |
-| 100 nF | L3 col 1 | LG rail row 4 |
-| Jack tip wire | L3 col 4 | |
-| Jack ring wire | L4 col 4 | |
-| Jack sleeve wire | LG rail row 5 | |
-| 1 kΩ (lies along the column, 0.3–0.4") | L4 col 5 | L7 col 5 |
-| 2N3904, flat face toward the left, standing in col 3 | emitter L6, base L7, collector L8 | |
-| Emitter jumper | L6 col 1 | LG rail row 6 |
-| 100 kΩ | L7 col 2 | LG rail row 7 |
-| Collector wire (insulated, lies over the board) | L8 col 6, down col 6 to row 15, left along row 15 to col 2 | L16 col 2 (next to **D7**) |
-| Port 2 collector wire | L14 col 1, straight down col 1 | L19 col 1 (next to **D10**) |
+| 22 Ω | outer rail, row 7 | row 7, k3 |
+| 4.7 µF (+ to row 7) | row 7, k5 | row 8, k5 |
+| 100 nF | row 7, k6 | row 8, k6 |
+| GND jumper | inner rail, row 8 | row 8, k1 |
+| 2N3904, flat face toward the channel, standing in k2 | emitter row 8, base row 9, collector row 10 | |
+| 100 kΩ | row 8, k4 | row 9, k4 |
+| 1 kΩ (lies along the column, 0.3") | row 9, k3 | row 11, k3 |
+| Tag `J1.T` / `J2.T` | row 7, k4 | |
+| Tag `J1.R` / `J2.R` | row 11, k4 | |
+| Collector wire, left block (insulated, down the k1 column) | row 10, k1 | left row 16, col 1 (beside **D7**) |
+| Collector wire, right block (insulated) | row 10, k1 (right col 12) down to row 14, left along row 14 to left col 2, down to row 19 | left row 19, col 2 (beside **D10**) |
+
+The sleeve of each jack has no wire on this board: it goes to GND on the connector board.
 
 **XIAO power and servos**
 
@@ -242,10 +249,16 @@ rows 9–14 and goes to **D10**. Values below are for port 1; add 6 rows for por
 | 1N5819 (band to the XIAO) | cathode L22 col 2 | anode L26 col 2 |
 | Anode jumper | L26 col 1 | L5 rail row 26 |
 | 100 µF (+ to row 22) and 100 nF | L22 col 1 | L21 col 1 |
-| Servos 1, 2, 3, 4: signal | R21 / R20 / R19 / R18, col 11 | |
-| Servos 1–4: + / − | R5 rail / RG rail, same row as the signal | |
+| Tags `S1`, `S2`, `S3`, `S4` | R21 / R20 / R19 / R18, col 11 | |
+| Tag `+5V` (20 AWG) | R5 rail row 23 | |
+| Tag `GND` (20 AWG) | RG rail row 24 | |
 
-**Soldering order that keeps things reachable:** rails and bridge wires, then the two sensor circuits, then the diode and caps beside the XIAO, then the XIAO last (it covers the
+**Wires between the two boards (10 plus the 12 V pair).** `S1`–`S4`, `J1.T`, `J1.R`, `J2.T`, `J2.R`, and one
+`+5V` and one `GND` (20 AWG, they carry every servo's current). `12V+` and `12V−` go from the jack to the 12 V chain
+above the buck, not to the main board. On the connector board the four servo + pins join one +5V bus, and the
+servo − pins and both jack sleeves join one GND bus.
+
+**Soldering order that keeps things reachable:** rails and bridge wires, then the two sensor blocks, then the diode and caps beside the XIAO, then the XIAO last (it covers the
 holes under it). Meter each rail for continuity to the far end, and meter across the channel on a spare row
 to confirm the halves are isolated, before the XIAO goes in.
 
