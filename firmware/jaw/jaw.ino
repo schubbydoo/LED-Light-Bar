@@ -59,7 +59,9 @@
   SEVERAL SERVOS ON ONE BOARD (docs/06-jaw-plan.md §10)
 
   One board is one prop; each servo is a CHANNEL (1..4, `channels <n>`, default 1).
-  Channel 1 is on D10, 2..4 on D1, D2, D3 (GPIO3/4/5 — never D0, D8, D9). Every
+  Channels 1..4 are on D1, D2, D3, D4 (GPIO3/4/5/6), all on one edge of the XIAO
+  so the servos can sit on one side of the board and the sensors on the other
+  (never D0, D8, D9). Every
   command without a channel means channel 1, and the single-servo replies are
   unchanged, so a box that knows only one servo keeps working.
 
@@ -80,7 +82,7 @@
 
   TWO ON/OFF SENSOR PORTS
 
-  D4 and D5 (GPIO6, GPIO7) are inputs with the internal pull-up, wired like the SFX
+  D7 and D10 (GPIO20, GPIO10) are inputs with the internal pull-up, wired like the SFX
   Box's sensor ports: a transistor stage that INVERTS, so motion pulls the pin LOW.
   A debounced change is announced over the radio, unasked:
 
@@ -92,8 +94,8 @@
   The bridge already forwards anything a prop says, tagged `jaw>`. `sens` reads the
   two inputs back: `sens 1=<0|1> 2=<0|1>`, and `st` carries `sens=<n1><n2>`.
 
-  Pins: D10 (GPIO10), D1..D3 servos; D4, D5 sensors. Never D0, D8 or D9 — see
-  CLAUDE.md, strapping pins.
+  Pins: D1..D4 servos; D7, D10 sensors 1, 2 (D7 is the UART RX pin; the board talks over
+  USB, so it is free). Never D0, D8 or D9 — see CLAUDE.md, strapping pins.
 */
 
 #include <Preferences.h>
@@ -110,7 +112,7 @@ struct Knob;
 
 static const int      MAX_CH    = 4;
 static const int      MAX_SLOTS = 8;
-static const int      CH_PINS[MAX_CH] = {D10, D1, D2, D3};     // GPIO10, 3, 4, 5
+static const int      CH_PINS[MAX_CH] = {D1, D2, D3, D4};      // GPIO3, 4, 5, 6
 static const uint32_t PWM_HZ    = 50;
 static const uint8_t  PWM_BITS  = 14;                      // 16384 counts per 20 ms
 static const uint32_t PERIOD_US = 1000000UL / PWM_HZ;
@@ -648,7 +650,7 @@ static void render(int i, float dt) {
 // Sensors: two on/off inputs, active LOW (the port's transistor stage inverts).
 // ---------------------------------------------------------------------------
 static const int      N_SENSORS = 2;
-static const int      SENSOR_PINS[N_SENSORS] = {D4, D5};       // GPIO6, GPIO7
+static const int      SENSOR_PINS[N_SENSORS] = {D7, D10};      // GPIO20, GPIO10 (sensor 1, 2)
 static const uint32_t SENSOR_DEBOUNCE_MS = 30;
 static const uint8_t  EV_REPEATS = 3;
 static const uint32_t EV_REPEAT_GAP_MS = 40;

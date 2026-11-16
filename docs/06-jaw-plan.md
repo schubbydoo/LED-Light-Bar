@@ -292,7 +292,7 @@ channel and slot NUMBERS only.
 | `auto <ch> on\|off` | Move on its own → `ok auto ...`; `refused ...` on a speech channel |
 | `stop` | releases the TRACK only (see below) |
 | `stop all` | also ends every channel's `auto` |
-| `channels <n>` | how many servos the board drives (1..4; channel 1 on D10, 2..4 on D1..D3) |
+| `channels <n>` | how many servos the board drives (1..4; channels 1..4 on D1..D4) |
 
 - A cue/track drives only speech channels.
 - **Dead-man:** `auto on` expires after 120 s unless repeated (the box re-sends every 60 s while

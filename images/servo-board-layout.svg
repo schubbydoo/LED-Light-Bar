@@ -557,55 +557,55 @@
 <polyline points="310,204 310,216 190,216 190,250" fill="none" stroke="#c0392b" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="310" cy="204" r="4" fill="#c0392b"/>
 <circle cx="190" cy="250" r="4.2" fill="#c0392b"/>
-<polyline points="334,204 334,226 214,226 214,274" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="334,204 334,226 214,226 214,250" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="334" cy="204" r="4" fill="#111111"/>
-<circle cx="214" cy="274" r="4.2" fill="#111111"/>
+<circle cx="214" cy="250" r="4.2" fill="#111111"/>
 <text x="304" y="216" font-size="9" fill="#c0392b" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">OUT+</text>
 <text x="340" y="216" font-size="9" fill="#111111" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">OUT−</text>
-<line x1="190" y1="298" x2="262" y2="322" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="190" cy="298" r="3.5" fill="#c0392b"/>
-<circle cx="262" cy="322" r="3.5" fill="#c0392b"/>
+<line x1="190" y1="322" x2="262" y2="298" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="190" cy="322" r="3.5" fill="#c0392b"/>
+<circle cx="262" cy="298" r="3.5" fill="#c0392b"/>
 <rect x="215.0" y="305.0" width="22" height="10" fill="#fff" stroke="#c0392b" stroke-width="1.8"/>
 <text x="224.0" y="302.0" font-size="10" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">22</text>
-<line x1="238" y1="322" x2="214" y2="322" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="238" cy="322" r="3.5" fill="#111111"/>
+<line x1="238" y1="298" x2="214" y2="298" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="238" cy="298" r="3.5" fill="#111111"/>
+<circle cx="214" cy="298" r="3.5" fill="#111111"/>
+<text x="226.0" y="289.0" font-size="10" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif"></text>
+<line x1="238" y1="298" x2="214" y2="322" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="238" cy="298" r="3.5" fill="#111111"/>
 <circle cx="214" cy="322" r="3.5" fill="#111111"/>
-<text x="226.0" y="313.0" font-size="10" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif"></text>
-<line x1="238" y1="322" x2="214" y2="346" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="238" cy="322" r="3.5" fill="#111111"/>
-<circle cx="214" cy="346" r="3.5" fill="#111111"/>
-<text x="226.0" y="325.0" font-size="10" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif"></text>
-<polyline points="120,319 310,322" fill="none" stroke="#c0392b" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="310" cy="322" r="4.2" fill="#c0392b"/>
-<polyline points="120,346 310,346" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="310" cy="346" r="4.2" fill="#1e8449"/>
-<polyline points="120,373 214,370" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="226.0" y="301.0" font-size="10" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif"></text>
+<polyline points="146,295 310,298" fill="none" stroke="#c0392b" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="310" cy="298" r="4.2" fill="#c0392b"/>
+<polyline points="146,322 310,322" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="310" cy="322" r="4.2" fill="#1e8449"/>
+<polyline points="146,349 214,346" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="214" cy="346" r="4.2" fill="#111111"/>
+<text x="142" y="292" font-size="10" fill="#c0392b" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">J1 T</text>
+<text x="142" y="326" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">R</text>
+<text x="142" y="362" font-size="10" fill="#111111" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">S</text>
+<line x1="334" y1="322" x2="334" y2="394" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="334" cy="322" r="3.5" fill="#1e8449"/>
+<circle cx="334" cy="394" r="3.5" fill="#1e8449"/>
+<rect x="329.0" y="347.0" width="10" height="22" fill="#fff" stroke="#1e8449" stroke-width="1.8"/>
+<text x="348.0" y="362.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">1k</text>
+<rect x="255" y="362" width="14" height="64" rx="7" fill="#fff" stroke="#111111" stroke-width="1.8"/>
+<text x="262" y="374" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">E</text>
+<text x="262" y="398" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">B</text>
+<text x="262" y="422" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">C</text>
+<polyline points="238,370 214,370" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="238" cy="370" r="4.2" fill="#111111"/>
 <circle cx="214" cy="370" r="4.2" fill="#111111"/>
-<text x="118" y="316" font-size="10" fill="#c0392b" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">J1 T</text>
-<text x="118" y="350" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">R</text>
-<text x="118" y="386" font-size="10" fill="#111111" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">S</text>
-<line x1="334" y1="346" x2="430" y2="346" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="334" cy="346" r="3.5" fill="#1e8449"/>
-<circle cx="430" cy="346" r="3.5" fill="#1e8449"/>
-<rect x="371.0" y="341.0" width="22" height="10" fill="#fff" stroke="#1e8449" stroke-width="1.8"/>
-<text x="382.0" y="337.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">1k</text>
-<rect x="423" y="314" width="14" height="64" rx="7" fill="#fff" stroke="#111111" stroke-width="1.8"/>
-<text x="430" y="350" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">B</text>
-<text x="430" y="326" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">E</text>
-<text x="430" y="374" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">C</text>
-<polyline points="478,322 550,322" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="478" cy="322" r="4.2" fill="#111111"/>
-<circle cx="550" cy="322" r="4.2" fill="#111111"/>
-<line x1="478" y1="346" x2="550" y2="346" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="478" cy="346" r="3.5" fill="#1e8449"/>
-<circle cx="550" cy="346" r="3.5" fill="#1e8449"/>
-<rect x="503.0" y="341.0" width="22" height="10" fill="#fff" stroke="#1e8449" stroke-width="1.8"/>
-<text x="514.0" y="337.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">100k</text>
-<line x1="190" y1="418" x2="262" y2="442" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="190" cy="418" r="3.5" fill="#c0392b"/>
+<line x1="262" y1="394" x2="214" y2="394" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="262" cy="394" r="3.5" fill="#1e8449"/>
+<circle cx="214" cy="394" r="3.5" fill="#1e8449"/>
+<rect x="227.0" y="389.0" width="22" height="10" fill="#fff" stroke="#1e8449" stroke-width="1.8"/>
+<text x="238.0" y="385.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">100k</text>
+<line x1="190" y1="466" x2="262" y2="442" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="190" cy="466" r="3.5" fill="#c0392b"/>
 <circle cx="262" cy="442" r="3.5" fill="#c0392b"/>
-<rect x="215.0" y="425.0" width="22" height="10" fill="#fff" stroke="#c0392b" stroke-width="1.8"/>
-<text x="224.0" y="422.0" font-size="10" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">22</text>
+<rect x="215.0" y="449.0" width="22" height="10" fill="#fff" stroke="#c0392b" stroke-width="1.8"/>
+<text x="224.0" y="446.0" font-size="10" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif"></text>
 <line x1="238" y1="442" x2="214" y2="442" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
 <circle cx="238" cy="442" r="3.5" fill="#111111"/>
 <circle cx="214" cy="442" r="3.5" fill="#111111"/>
@@ -614,38 +614,38 @@
 <circle cx="238" cy="442" r="3.5" fill="#111111"/>
 <circle cx="214" cy="466" r="3.5" fill="#111111"/>
 <text x="226.0" y="445.0" font-size="10" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif"></text>
-<polyline points="120,439 310,442" fill="none" stroke="#c0392b" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="146,439 310,442" fill="none" stroke="#c0392b" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="310" cy="442" r="4.2" fill="#c0392b"/>
-<polyline points="120,466 310,466" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="146,466 310,466" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="310" cy="466" r="4.2" fill="#1e8449"/>
-<polyline points="120,493 214,490" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="146,493 214,490" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="214" cy="490" r="4.2" fill="#111111"/>
-<text x="118" y="436" font-size="10" fill="#c0392b" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">J2 T</text>
-<text x="118" y="470" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">R</text>
-<text x="118" y="506" font-size="10" fill="#111111" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">S</text>
-<line x1="334" y1="466" x2="430" y2="466" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
+<text x="142" y="436" font-size="10" fill="#c0392b" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">J2 T</text>
+<text x="142" y="470" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">R</text>
+<text x="142" y="506" font-size="10" fill="#111111" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">S</text>
+<line x1="334" y1="466" x2="334" y2="538" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
 <circle cx="334" cy="466" r="3.5" fill="#1e8449"/>
-<circle cx="430" cy="466" r="3.5" fill="#1e8449"/>
-<rect x="371.0" y="461.0" width="22" height="10" fill="#fff" stroke="#1e8449" stroke-width="1.8"/>
-<text x="382.0" y="457.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">1k</text>
-<rect x="423" y="434" width="14" height="64" rx="7" fill="#fff" stroke="#111111" stroke-width="1.8"/>
-<text x="430" y="470" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">B</text>
-<text x="430" y="446" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">E</text>
-<text x="430" y="494" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">C</text>
-<polyline points="478,442 550,442" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="478" cy="442" r="4.2" fill="#111111"/>
-<circle cx="550" cy="442" r="4.2" fill="#111111"/>
-<line x1="478" y1="466" x2="550" y2="466" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="478" cy="466" r="3.5" fill="#1e8449"/>
-<circle cx="550" cy="466" r="3.5" fill="#1e8449"/>
-<rect x="503.0" y="461.0" width="22" height="10" fill="#fff" stroke="#1e8449" stroke-width="1.8"/>
-<text x="514.0" y="457.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">100k</text>
-<polyline points="478,370 610,370 610,658 502,658" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="478" cy="370" r="3.5" fill="#1e8449"/>
-<circle cx="502" cy="658" r="3.5" fill="#1e8449"/>
-<polyline points="478,490 598,490 598,634 502,634" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="478" cy="490" r="3.5" fill="#1e8449"/>
-<circle cx="502" cy="634" r="3.5" fill="#1e8449"/>
+<circle cx="334" cy="538" r="3.5" fill="#1e8449"/>
+<rect x="329.0" y="491.0" width="10" height="22" fill="#fff" stroke="#1e8449" stroke-width="1.8"/>
+<text x="348.0" y="506.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif"></text>
+<rect x="255" y="506" width="14" height="64" rx="7" fill="#fff" stroke="#111111" stroke-width="1.8"/>
+<text x="262" y="518" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">E</text>
+<text x="262" y="542" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">B</text>
+<text x="262" y="566" font-size="9" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">C</text>
+<polyline points="238,514 214,514" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="238" cy="514" r="4.2" fill="#111111"/>
+<circle cx="214" cy="514" r="4.2" fill="#111111"/>
+<line x1="262" y1="538" x2="214" y2="538" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="262" cy="538" r="3.5" fill="#1e8449"/>
+<circle cx="214" cy="538" r="3.5" fill="#1e8449"/>
+<rect x="227.0" y="533.0" width="22" height="10" fill="#fff" stroke="#1e8449" stroke-width="1.8"/>
+<text x="238.0" y="529.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif"></text>
+<polyline points="358,418 358,586 262,586 262,610" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="358" cy="418" r="3.5" fill="#1e8449"/>
+<circle cx="262" cy="610" r="3.5" fill="#1e8449"/>
+<polyline points="238,562 238,682" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="238" cy="562" r="3.5" fill="#1e8449"/>
+<circle cx="238" cy="682" r="3.5" fill="#1e8449"/>
 <polyline points="262,730 214,730" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="262" cy="730" r="4.2" fill="#111111"/>
 <circle cx="214" cy="730" r="4.2" fill="#111111"/>
@@ -661,40 +661,40 @@
 <circle cx="238" cy="754" r="3.5" fill="#111111"/>
 <circle cx="238" cy="730" r="3.5" fill="#111111"/>
 <text x="192.0" y="746.0" font-size="10" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">100µ+100n</text>
-<line x1="262" y1="682" x2="120" y2="682" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="262" cy="682" r="4.2" fill="#1e8449"/>
-<line x1="190" y1="682" x2="120" y2="690" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="190" cy="682" r="4.2" fill="#c0392b"/>
-<line x1="214" y1="682" x2="120" y2="674" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="214" cy="682" r="4.2" fill="#111111"/>
-<text x="114" y="686" font-size="10" fill="#111111" text-anchor="end" font-weight="bold" font-family="Helvetica,Arial,sans-serif">SERVO 1</text>
-<circle cx="502" cy="682" r="4" fill="#1e8449"/>
-<line x1="502" y1="682" x2="638" y2="682" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="574" cy="682" r="4.2" fill="#c0392b"/>
-<circle cx="550" cy="682" r="4.2" fill="#111111"/>
-<line x1="574" y1="682" x2="638" y2="690" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
-<line x1="550" y1="682" x2="638" y2="674" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
-<text x="644" y="686" font-size="10" fill="#111111" text-anchor="start" font-weight="bold" font-family="Helvetica,Arial,sans-serif">SERVO 4</text>
-<circle cx="502" cy="706" r="4" fill="#1e8449"/>
-<line x1="502" y1="706" x2="638" y2="706" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="574" cy="706" r="4.2" fill="#c0392b"/>
-<circle cx="550" cy="706" r="4.2" fill="#111111"/>
-<line x1="574" y1="706" x2="638" y2="714" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
-<line x1="550" y1="706" x2="638" y2="698" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
-<text x="644" y="710" font-size="10" fill="#111111" text-anchor="start" font-weight="bold" font-family="Helvetica,Arial,sans-serif">SERVO 3</text>
 <circle cx="502" cy="730" r="4" fill="#1e8449"/>
 <line x1="502" y1="730" x2="638" y2="730" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
 <circle cx="574" cy="730" r="4.2" fill="#c0392b"/>
 <circle cx="550" cy="730" r="4.2" fill="#111111"/>
 <line x1="574" y1="730" x2="638" y2="738" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
 <line x1="550" y1="730" x2="638" y2="722" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
-<text x="644" y="734" font-size="10" fill="#111111" text-anchor="start" font-weight="bold" font-family="Helvetica,Arial,sans-serif">SERVO 2</text>
-<line x1="190" y1="562" x2="574" y2="562" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="190" cy="562" r="4.2" fill="#c0392b"/>
-<circle cx="574" cy="562" r="4.2" fill="#c0392b"/>
-<line x1="214" y1="538" x2="550" y2="538" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="214" cy="538" r="4.2" fill="#111111"/>
-<circle cx="550" cy="538" r="4.2" fill="#111111"/>
+<text x="644" y="734" font-size="10" fill="#111111" text-anchor="start" font-weight="bold" font-family="Helvetica,Arial,sans-serif">SERVO 1</text>
+<circle cx="502" cy="706" r="4" fill="#1e8449"/>
+<line x1="502" y1="706" x2="638" y2="706" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="574" cy="706" r="4.2" fill="#c0392b"/>
+<circle cx="550" cy="706" r="4.2" fill="#111111"/>
+<line x1="574" y1="706" x2="638" y2="714" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+<line x1="550" y1="706" x2="638" y2="698" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
+<text x="644" y="710" font-size="10" fill="#111111" text-anchor="start" font-weight="bold" font-family="Helvetica,Arial,sans-serif">SERVO 2</text>
+<circle cx="502" cy="682" r="4" fill="#1e8449"/>
+<line x1="502" y1="682" x2="638" y2="682" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="574" cy="682" r="4.2" fill="#c0392b"/>
+<circle cx="550" cy="682" r="4.2" fill="#111111"/>
+<line x1="574" y1="682" x2="638" y2="690" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+<line x1="550" y1="682" x2="638" y2="674" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
+<text x="644" y="686" font-size="10" fill="#111111" text-anchor="start" font-weight="bold" font-family="Helvetica,Arial,sans-serif">SERVO 3</text>
+<circle cx="502" cy="658" r="4" fill="#1e8449"/>
+<line x1="502" y1="658" x2="638" y2="658" stroke="#1e8449" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="574" cy="658" r="4.2" fill="#c0392b"/>
+<circle cx="550" cy="658" r="4.2" fill="#111111"/>
+<line x1="574" y1="658" x2="638" y2="666" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+<line x1="550" y1="658" x2="638" y2="650" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
+<text x="644" y="662" font-size="10" fill="#111111" text-anchor="start" font-weight="bold" font-family="Helvetica,Arial,sans-serif">SERVO 4</text>
+<line x1="190" y1="874" x2="574" y2="874" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="190" cy="874" r="4.2" fill="#c0392b"/>
+<circle cx="574" cy="874" r="4.2" fill="#c0392b"/>
+<line x1="214" y1="898" x2="550" y2="898" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="214" cy="898" r="4.2" fill="#111111"/>
+<circle cx="550" cy="898" r="4.2" fill="#111111"/>
 <line x1="574" y1="850" x2="550" y2="850" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
 <circle cx="574" cy="850" r="3.5" fill="#c0392b"/>
 <circle cx="550" cy="850" r="3.5" fill="#c0392b"/>

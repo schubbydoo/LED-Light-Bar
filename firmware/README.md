@@ -377,8 +377,8 @@ current (459 mA measured, `docs/07-servo-s51.md`) until told to move.
 
 ### Several servos on one board
 
-One board is one prop; each servo is a **channel** (`channels <1..4>`, default 1). Channel 1 is on
-D10, channels 2..4 on D1, D2, D3. Un-prefixed commands mean channel 1, and the single-servo
+One board is one prop; each servo is a **channel** (`channels <1..4>`, default 1). Channels 1..4 are on
+D1, D2, D3, D4. Un-prefixed commands mean channel 1, and the single-servo
 `show`/`st` lines are unchanged, so a box that knows one servo keeps working.
 
 A channel's **mode** is `speech` (follows the box's track) or `manual` (goes to a numbered position

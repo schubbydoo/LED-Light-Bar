@@ -13,7 +13,7 @@ Another project that has an S51 can link or copy it as it stands.
 
 | Wire colour | Function | Goes to |
 |---|---|---|
-| **Orange** | Signal | a GPIO (on the jaw: XIAO **D10**) |
+| **Orange** | Signal | a GPIO (on the jaw board: XIAO **D1**, channel 1) |
 | **Red** | Positive (+) | the servo's own 5 V supply |
 | **Brown** | Negative (−) | supply GND, **and** the controller's GND |
 
@@ -188,4 +188,4 @@ signal input draws almost nothing; the supply and the 1000 µF at the connector 
 `bar.ino` (strip data); a servo needs `jaw.ino`. With `bar.ino` running a servo jitters; with
 `jaw.ino` running a strip flickers. Neither is damaged, but do not leave the wrong one plugged in.
 The bridge also knows a board by its radio address, so decide which prop that board stands for.
-One servo per connector, on channel 1 (D10); channels 2..4 are on other pins the JST does not reach.
+One servo per connector. The bar's own D10 feeds it; the jaw board has no JST.

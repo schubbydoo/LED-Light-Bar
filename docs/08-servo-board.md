@@ -5,7 +5,7 @@ suggestions to check against their datasheets, not tested parts. Measured figure
 and come from `docs/07-servo-s51.md` and the bench on 2026-11-15.
 
 The board carries a XIAO ESP32C3 running `firmware/jaw/` and up to **4 servos** (channels 1..4 on
-D10, D1, D2, D3). It is fed from a **12 V power brick or the TalentCell 12 V battery**, whichever
+D1, D2, D3, D4). It is fed from a **12 V power brick or the TalentCell 12 V battery**, whichever
 is available, and makes its own 5 V.
 
 ---
@@ -69,17 +69,18 @@ One **3-pin 0.1" male header per servo**, in the S51's own order so the servo pl
 
 | Channel | XIAO silkscreen | GPIO |
 |---|---|---|
-| 1 | D10 | GPIO10 |
-| 2 | D1 | GPIO3 |
-| 3 | D2 | GPIO4 |
-| 4 | D3 | GPIO5 |
+| 1 | D1 | GPIO3 |
+| 2 | D2 | GPIO4 |
+| 3 | D3 | GPIO5 |
+| 4 | D4 | GPIO6 |
 | *never* | D0, D8, D9 | GPIO2, 8, 9 — strapping, see CLAUDE.md |
 
 3.3 V signals drive the S51 directly (measured); no level shifter. A 100–330 Ω series resistor on
 each signal is optional protection. There are **no per-servo pull-downs or caps**: the pull-downs did not stop the boot twitch when tried, and the one bulk cap serves all four servos.
 
-D4 and D5 (GPIO6, 7) are the two sensor inputs (§7). D6/D7 are the UART pins and are left unused:
-the chip prints boot messages on one of them.
+D7 (GPIO20) and D10 (GPIO10) are the two sensor inputs (§7), on the opposite edge of the XIAO from the
+servos. D7 is the UART receive pin and is free because the board talks over USB. D5 and D6 are unused (D6 is
+the UART transmit pin and prints boot messages).
 
 ## 4. Before first power
 
@@ -137,7 +138,7 @@ before ordering.**
 
 ---
 
-## 7. Two sensor ports (D4, D5)
+## 7. Two sensor ports (D7, D10)
 
 Same port as the SFX Box's (`SFX box/sfx-box-wiring.md`, "Sensor daughter board"), so the same
 sensor plugs into either: **3.5 mm stereo jack, Tip = +5 V, Ring = signal, Sleeve = GND.** A Neumi
@@ -158,7 +159,7 @@ the same (n, state, seq). The bridge needs no change: it already prints anything
 tagged `jaw>`. `sens` reads the two inputs back (`sens 1=0 2=0`) and `st` carries `sens=00`.
 **Not done:** the SFX Box does not yet read unsolicited `ev` lines or offer them as triggers.
 
-Bench test without the circuit: the pins idle HIGH, so touching a wire from D4 or D5 to GND
+Bench test without the circuit: the pins idle HIGH, so touching a wire from D7 or D10 to GND
 looks like motion.
 
 Parts for the two ports (copied from the SFX Box's list, per port): 1 × 3.5 mm stereo jack, 1 ×
@@ -177,10 +178,11 @@ the layout is relative to the XIAO, so a column or two of difference only shifts
 - About 28 rows. Rows are numbered from the top in the drawing.
 - Rails: **inner strip (next to the holes) = GND, outer strip = +5 V**, on both sides.
 
-**Why the XIAO is turned so the USB end points at the bottom:** the signal pins D1–D5 then land on the right
-half, next to the right rail, with free holes beside each pin. D10, 5V and GND land on the left half next to
-the left rail. Rotate the whole board 180° in the box if the USB end should face elsewhere; the design is
-mirror-symmetric in what it needs.
+**Why the XIAO is turned so the USB end points at the bottom:** the four servo pins D1–D4 are on one edge of
+the XIAO and the two sensor pins D7 and D10 are on the other. Turned this way the servos land on the right
+half, beside the right rail, and the sensor circuits and jacks sit on the left half beside the left rail, so
+each side of the box has one kind of connector. Rotate the whole board 180° in the box if the USB end should
+face elsewhere; the design is mirror-symmetric in what it needs.
 
 **XIAO position:** left pins in left-half column 3, right pins in right-half column 10, rows 16–22. Holes
 at left columns 1–2 and right columns 11–12 stay free beside the pins. Rows above row 15 and below row 23
@@ -188,12 +190,12 @@ are free across both halves.
 
 | Rows | Left pin | Right pin |
 |---|---|---|
-| 16 | D7 (unused) | D6 (unused) |
-| 17 | D8 (avoid) | **D5** sensor 2 |
-| 18 | D9 (avoid) | **D4** sensor 1 |
-| 19 | **D10** servo 1 | **D3** servo 4 |
-| 20 | 3V3 (unused) | **D2** servo 3 |
-| 21 | GND | **D1** servo 2 |
+| 16 | **D7** sensor 1 | D6 (unused) |
+| 17 | D8 (avoid) | D5 (unused) |
+| 18 | D9 (avoid) | **D4** servo 4 |
+| 19 | **D10** sensor 2 | **D3** servo 3 |
+| 20 | 3V3 (unused) | **D2** servo 2 |
+| 21 | GND | **D1** servo 1 |
 | 22 | 5V | D0 (avoid) |
 
 ### Hole list (row, side-column; `L`/`R` = left/right half, rail = `L5 LG R5 RG`)
@@ -203,33 +205,34 @@ buck is the only thing between them: barrel jack + → PTC fuse → 1N5822 (band
 with the 100 µF 25 V and the TVS (P6KE15A, band to +) from that node to GND, and jack GND → buck IN−. Build
 it on the buck's own bit of board or wire it point to point. Nothing from this chain goes on the SB400 board.
 
-**5 V side, on the board** (rows 1–3 are now spare)
+**5 V side, on the board** (rows 1–2 are spare)
 
 | Part | From | To |
 |---|---|---|
-| Buck OUT+ / OUT− | L5 rail row 1 | LG rail row 2 |
-| Bridge GND | LG row 13 | RG row 13 |
-| Bridge +5 V | L5 row 14 | R5 row 14 |
+| Buck OUT+ / OUT− | L5 rail row 1 | LG rail row 1 |
+| Bridge +5 V (wire) | L5 rail row 27 | R5 rail row 27 |
+| Bridge GND (wire) | LG rail row 28 | RG rail row 28 |
 | 1000 µF 10 V+ (+ to outer rail) | R5 rail row 26 | RG rail row 26 |
 
 Bridge the rails with wire, not just the strips: four stalled servos draw about 1.9 A.
 
-**Sensor ports.** Same circuit twice. Port 1 uses rows 4–6 (base row 5); port 2 uses rows 9–11 (base row 10).
-Values below are for port 1; add 5 rows for port 2.
+**Sensor ports, all on the left half.** Same circuit twice. Port 1 uses rows 3–8 and goes to **D7**; port 2 uses
+rows 9–14 and goes to **D10**. Values below are for port 1; add 6 rows for port 2 (tip row 9, ring row 10, and so on).
 
 | Part | From | To |
 |---|---|---|
-| 22 Ω | L5 rail row 3 | L4 col 2 |
-| 4.7 µF (+ to the row) | L4 col 1 | LG rail row 4 |
-| 100 nF | L4 col 1 | LG rail row 5 |
-| Jack tip wire | L4 col 4 | |
-| Jack ring wire | L5 col 4 | |
-| Jack sleeve wire | LG rail row 6 | |
-| 1 kΩ (straddles the channel) | L5 col 5 | R5 col 8 |
-| 2N3904, flat face toward the left, standing in right col 9 | emitter R4, base R5, collector R6 | |
-| Emitter jumper | R4 col 10 | RG rail row 4 |
-| 100 kΩ | R5 col 10 | RG rail row 5 |
-| Collector wire (insulated, around the outside of the rails) | R6 col 10 | **D4** at R18 col 11 (port 2: R11 col 10 to **D5** at R17 col 11) |
+| 22 Ω | L5 rail row 4 | L row 3, col 2 |
+| 4.7 µF (+ to the row) | L3 col 1 | LG rail row 3 |
+| 100 nF | L3 col 1 | LG rail row 4 |
+| Jack tip wire | L3 col 4 | |
+| Jack ring wire | L4 col 4 | |
+| Jack sleeve wire | LG rail row 5 | |
+| 1 kΩ (lies along the column, 0.3–0.4") | L4 col 5 | L7 col 5 |
+| 2N3904, flat face toward the left, standing in col 3 | emitter L6, base L7, collector L8 | |
+| Emitter jumper | L6 col 1 | LG rail row 6 |
+| 100 kΩ | L7 col 2 | LG rail row 7 |
+| Collector wire (insulated, lies over the board) | L8 col 6, down col 6 to row 15, left along row 15 to col 2 | L16 col 2 (next to **D7**) |
+| Port 2 collector wire | L14 col 1, straight down col 1 | L19 col 1 (next to **D10**) |
 
 **XIAO power and servos**
 
@@ -239,9 +242,8 @@ Values below are for port 1; add 5 rows for port 2.
 | 1N5819 (band to the XIAO) | cathode L22 col 2 | anode L26 col 2 |
 | Anode jumper | L26 col 1 | L5 rail row 26 |
 | 100 µF (+ to row 22) and 100 nF | L22 col 1 | L21 col 1 |
-| Servo 1: signal / + / − | L19 col 2 / L5 rail row 19 / LG rail row 19 | |
-| Servos 2, 3, 4: signal | R21 col 11 / R20 col 11 / R19 col 11 | |
-| Servos 2, 3, 4: + / − | R5 rail / RG rail, same row as the signal | |
+| Servos 1, 2, 3, 4: signal | R21 / R20 / R19 / R18, col 11 | |
+| Servos 1–4: + / − | R5 rail / RG rail, same row as the signal | |
 
 **Soldering order that keeps things reachable:** rails and bridge wires, then the two sensor circuits, then the diode and caps beside the XIAO, then the XIAO last (it covers the
 holes under it). Meter each rail for continuity to the far end, and meter across the channel on a spare row
