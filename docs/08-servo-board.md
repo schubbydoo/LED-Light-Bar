@@ -181,12 +181,14 @@ rounded tag in the layout (`12V+`, `J1.T`, `S1`, `+5V` and so on) is a wire to t
 - **Every row is split into three islands: 5 holes | 2 holes | 5 holes.** The 2-hole island in the middle is its own
   net (drawn as a lighter pad in the layout). The XIAO's pins land one in each 5-hole island, so its body sits over the
   middle one.
-- About 30 rows along the strips. The layout needs **21**, so the board can be cut after row 21 (about 0.9" off the end)
+- About 30 rows along the strips. The layout needs **20**, so the board can be cut after row 20 (about 1" off the end)
   and the offcut used for the connector board. Cut through a gap in the copper, not along a strip.
 
 **How I used the strips (both sides, mirrored):** A = **+5 V**; B and C = **GND**, tied together with a short wire at
-row 1 and row 20 so the ground has two strips of copper, and so every ground connection has a strip right beside the
-holes. The 1000 µF sits across A and B, which are adjacent.
+row 1 so every ground connection has a strip right beside the holes. The 1000 µF sits across A and B, which are
+adjacent. **Both bus connections are across the top:** the GND bridge on row 1 and the +5 V bridge on row 2, and the
+`+5V` and `GND` tags to the connector board leave from those same rows. That means the heavy servo current never
+runs down the strips, so no ground jumper is needed near the XIAO.
 
 **Why the XIAO is turned so the USB end points at the bottom:** the four servo pins D1–D4 are on the right edge
 of the XIAO and the sensor pins D7 and D10 are on the left. The sensor circuit for D7 sits in the left island and the
@@ -195,7 +197,7 @@ short. Rotate the whole board 180° in the box if the USB end should face elsewh
 
 **XIAO position:** left pins in column 3 of the left island, right pins in column 3 of the right island (columns
 1–5 left, 6–7 middle, 8–12 right, so these are columns 3 and 10), rows 11–17. Columns 1–2 and 11–12 stay free beside
-the pins. The sensor blocks sit above it in rows 2–7.
+the pins. The sensor blocks sit above it in rows 3–8.
 
 | Rows | Left pin | Right pin |
 |---|---|---|
@@ -220,32 +222,35 @@ it on the buck's own bit of board or wire it point to point. Nothing from this c
 |---|---|---|
 | Buck OUT+ | left A, row 1 | |
 | Buck OUT− | left B, row 1 | |
-| B-to-C ground jumpers (4 short wires) | left B and C, rows 1 and 20 | right B and C, rows 1 and 20 |
+| B-to-C ground jumpers (2 short wires) | left B to left C, row 1 | right B to right C, row 1 |
 | Bridge GND (wire) | left C, row 1 | right C, row 1 |
-| Bridge +5 V (wire) | left A, row 8 | right A, row 8 |
-| 1000 µF 10 V+ (+ to A) | right A, row 21 | right B, row 21 |
+| Bridge +5 V (wire) | left A, row 2 | right A, row 2 |
+| 1000 µF 10 V+ (+ to A) | right A, row 10 | right B, row 10 |
+| Tag `GND` (20 AWG) | right C, row 1 | |
+| Tag `+5V` (20 AWG) | right A, row 2 | |
 
-Bridge the sides with wire, not just the strips: four stalled servos draw about 1.9 A.
+Bridge the sides with wire, not just the strips: four stalled servos draw about 1.9 A. The two 20 AWG tag wires
+take that current straight from the bridges, which is why nothing heavy runs down a strip.
 
-**Sensor circuits (two mirror-image blocks, rows 2–7).** The left block serves sensor 1 and goes to **D7**; the
+**Sensor circuits (two mirror-image blocks, rows 3–8).** The left block serves sensor 1 and goes to **D7**; the
 right block serves sensor 2 and goes to **D10**. Columns are counted from the block's own side: "k1" is the hole
-next to strip C, k5 the hole nearest the middle island. Rows: **2 feed, 3 tip, 4 ring, 5 GND, 6 base, 7 collector.**
+next to strip C, k5 the hole nearest the middle island. Rows: **3 feed, 4 tip, 5 ring, 6 GND, 7 base, 8 collector.**
 The dashed lines in the drawing are the copper that joins holes in a row, not wires. Nothing of the same
-colour crosses: the collector wire leaves downward from row 7, below the ring wire.
+colour crosses: the collector wire leaves downward from row 8, below the ring wire.
 
 | Part | From | To |
 |---|---|---|
-| +5 V feed wire | A, row 2 | row 2, k3 |
-| 22 Ω (stands vertically) | row 2, k3 | row 3, k3 |
-| 4.7 µF (+ to row 3) and 100 nF, side by side in the same two holes | row 3, k5 | row 5, k5 |
-| GND jumper | C, row 5 | row 5, k1 |
-| 2N3904 standing in k2 | emitter row 5, base row 6, collector row 7 | |
-| 1 kΩ (lies along the column, 0.2") | row 4, k3 | row 6, k3 |
-| 100 kΩ (stands vertically) | row 5, k4 | row 6, k4 |
-| Tag `J1.T` / `J2.T` | row 3, k1 | |
-| Tag `J1.R` / `J2.R` | row 4, k1 | |
-| Collector wire, left block (insulated, down column 1) | row 7, col 1 | left row 11, col 1 (beside **D7**) |
-| Collector wire, right block (insulated) | row 7, col 12, down to row 9, left along row 9 to left col 2, down to row 14 | left row 14, col 2 (beside **D10**) |
+| +5 V feed wire | A, row 3 | row 3, k3 |
+| 22 Ω (stands vertically) | row 3, k3 | row 4, k3 |
+| 4.7 µF (+ to row 4) and 100 nF, side by side in the same two holes | row 4, k5 | row 6, k5 |
+| GND jumper | C, row 6 | row 6, k1 |
+| 2N3904 standing in k2 | emitter row 6, base row 7, collector row 8 | |
+| 1 kΩ (lies along the column, 0.2") | row 5, k3 | row 7, k3 |
+| 100 kΩ (stands vertically) | row 6, k4 | row 7, k4 |
+| Tag `J1.T` / `J2.T` | row 4, k1 | |
+| Tag `J1.R` / `J2.R` | row 5, k1 | |
+| Collector wire, left block (insulated, down column 1) | row 8, col 1 | left row 11, col 1 (beside **D7**) |
+| Collector wire, right block (insulated) | row 8, col 12, down to row 9, left along row 9 to left col 2, down to row 14 | left row 14, col 2 (beside **D10**) |
 
 The sleeve of each jack has no wire on this board: it goes to GND on the connector board.
 
@@ -254,12 +259,10 @@ The sleeve of each jack has no wire on this board: it goes to GND on the connect
 | Part | From | To |
 |---|---|---|
 | GND jumper | left row 16, col 2 | left C, row 16 |
-| 1N5819 (band to the XIAO) | cathode left row 17, col 2 | anode left row 21, col 2 |
-| Anode jumper | left row 21, col 1 | left A, row 21 |
+| 1N5819 (band to the XIAO; bend the leads to 0.3") | cathode left row 17, col 2 | anode left row 20, col 2 |
+| Anode jumper | left row 20, col 1 | left A, row 20 |
 | 100 µF (+ to row 17) and 100 nF, side by side | left row 17, col 1 | left row 16, col 1 |
 | Tags `S1`, `S2`, `S3`, `S4` | right rows 16 / 15 / 14 / 13, col 11 | |
-| Tag `+5V` (20 AWG) | right A, row 18 | |
-| Tag `GND` (20 AWG) | right C, row 19 | |
 
 **Wires between the two boards (10 plus the 12 V pair).** `S1`–`S4`, `J1.T`, `J1.R`, `J2.T`, `J2.R`, and one
 `+5V` and one `GND` (20 AWG, they carry every servo's current). `12V+` and `12V−` go from the jack to the 12 V chain
