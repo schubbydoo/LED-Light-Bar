@@ -114,10 +114,10 @@ before ordering.**
 | 1 | Controller | Seeed XIAO ESP32C3 (SKU 113991054) | 1 | **yes** (2 per `05-parts.md`; one is the bar) | the jaw board already runs `jaw.ino` |
 | 2 | 5 V buck converter | **MP1584EN module** (the EBOOT 6-pack) | 1 | **OWNED** (SFX BOM) | set to 5.0 V *before* connecting anything. Fine for a typical show. Marginal for four servos stalling at once (~1.9 A): these are rated 3 A peak but run hot near that |
 | 2b | *or* a stronger buck | Pololu D36V28F5, 5 V 3.2 A step-down, 6–50 V in (Pololu #3782) | 1 | ? | the safe choice if you want the all-stalled worst case covered |
-| 3 | Schottky, XIAO 5V feed | 1N5819 (DO-41) | 1 | ? (bar board uses one) | Seeed requires it on the 5V pin |
-| 4 | Reverse-polarity diode | 1N5822 (3 A, 40 V) or SS54 | 1 | ? | in series at the 12 V input; costs ~0.4 V, harmless into a buck |
-| 5 | TVS diode | SMBJ15A | 1 | ? | across the 12 V input, after the fuse |
-| 6 | Resettable fuse | Bourns MF-R200 (2 A hold) | 1 | ? | on the 12 V input. Check its voltage rating against the 12.6 V battery |
+| 3 | Schottky, XIAO 5V feed | 1N5819 (DO-41) | 1 | **yes** (owned) | Seeed requires it on the 5V pin |
+| 4 | Reverse-polarity diode | 1N5822 (3 A, 40 V); SB340 or 1N5823 also fit | 1 | **buying** | in series at the 12 V input; costs ~0.4 V, harmless into a buck. A 1N5819 (1 A) would run at its limit with all four servos stalled |
+| 5 | TVS diode | **P6KE15A** (through-hole, unidirectional, no "CA" suffix) | 1 | **buying** | across the buck's IN+ and IN− pads, band to +. The SMD SMBJ15A is the same part electrically |
+| 6 | Resettable fuse | 16 V plug-in PTC kit (0.5–10 A); use the **2 A** | 1 | **buying** (kit) | first part on the 12 V input. 16 V is fine for 12–12.6 V; check the brick's no-load voltage stays under 16 V. Worst-case draw on this side is about 1 A |
 | 7 | Bulk cap, servo bus | 1000 µF, 16 V electrolytic | 1 | **[bin?]** | at the buck output; 470 µF also acceptable |
 | 8 | Input cap | 100 µF, 25 V electrolytic | 1 | ? | at the buck input |
 | 9 | XIAO feed cap | 100 µF, 10 V or higher | 1 | ? | at the XIAO 5V pin, after the Schottky; it only has to carry the XIAO (~100 mA, radio bursts higher) through short dips |
@@ -248,5 +248,11 @@ rows 9–14 and goes to **D10**. Values below are for port 1; add 6 rows for por
 **Soldering order that keeps things reachable:** rails and bridge wires, then the two sensor circuits, then the diode and caps beside the XIAO, then the XIAO last (it covers the
 holes under it). Meter each rail for continuity to the far end, and meter across the channel on a spare row
 to confirm the halves are isolated, before the XIAO goes in.
+
+**Mounting the buck module.** The MP1584EN modules have four pads (IN+, IN−, OUT+, OUT−) and no pins, and
+they don't land on a 0.1" grid, which is why they won't drop into a perfboard. The usual way is simply wires:
+tin each pad, solder a short 22 AWG wire (red for +, black for −), add a dab of hot glue over the joints as strain
+relief, and stick the module down with double-sided foam tape. Set the output to 5.0 V with a meter
+*before* connecting anything to it.
 
 **Keep the buck module off the board, a few cm from the XIAO.** Its inductor is the noisiest thing in the box.
