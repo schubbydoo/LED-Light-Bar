@@ -220,24 +220,26 @@ it on the buck's own bit of board or wire it point to point. Nothing from this c
 
 Bridge the rails with wire, not just the strips: four stalled servos draw about 1.9 A.
 
-**Sensor circuits (two mirror-image blocks, rows 7–11).** The left block serves sensor 1 and goes to **D7**; the
+**Sensor circuits (two mirror-image blocks, rows 6–11).** The left block serves sensor 1 and goes to **D7**; the
 right block serves sensor 2 and goes to **D10**. Columns are counted from the block's own rail: "k1" is the hole
-next to the rail, k6 the hole nearest the channel. The rail is the inner (GND) and outer (+5 V) pair on that side.
-Rows are relative to the top of the block: **7 tip, 8 GND, 9 base, 10 collector, 11 ring.**
+next to the rail, k6 the hole nearest the channel. Rows: **6 feed, 7 tip, 8 ring, 9 GND, 10 base, 11 collector.**
+The dashed lines in the drawing are the copper strips that join holes in a row, not wires. Nothing of the same
+colour crosses: the collector wire leaves downward from row 11, below the ring wire.
 
 | Part | From | To |
 |---|---|---|
-| 22 Ω | outer rail, row 7 | row 7, k3 |
-| 4.7 µF (+ to row 7) | row 7, k5 | row 8, k5 |
-| 100 nF | row 7, k6 | row 8, k6 |
-| GND jumper | inner rail, row 8 | row 8, k1 |
-| 2N3904, flat face toward the channel, standing in k2 | emitter row 8, base row 9, collector row 10 | |
-| 100 kΩ | row 8, k4 | row 9, k4 |
-| 1 kΩ (lies along the column, 0.3") | row 9, k3 | row 11, k3 |
-| Tag `J1.T` / `J2.T` | row 7, k4 | |
-| Tag `J1.R` / `J2.R` | row 11, k4 | |
-| Collector wire, left block (insulated, down the k1 column) | row 10, k1 | left row 16, col 1 (beside **D7**) |
-| Collector wire, right block (insulated) | row 10, k1 (right col 12) down to row 14, left along row 14 to left col 2, down to row 19 | left row 19, col 2 (beside **D10**) |
+| +5 V feed wire | outer rail, row 6 | row 6, k3 |
+| 22 Ω (stands vertically) | row 6, k3 | row 7, k3 |
+| 4.7 µF (+ to row 7) | row 7, k5 | row 9, k5 |
+| 100 nF | row 7, k6 | row 9, k6 |
+| GND jumper | inner rail, row 9 | row 9, k1 |
+| 2N3904 standing in k2 | emitter row 9, base row 10, collector row 11 | |
+| 1 kΩ (lies along the column, 0.2") | row 8, k3 | row 10, k3 |
+| 100 kΩ (stands vertically) | row 9, k4 | row 10, k4 |
+| Tag `J1.T` / `J2.T` | row 7, k1 | |
+| Tag `J1.R` / `J2.R` | row 8, k1 | |
+| Collector wire, left block (insulated, down column 1) | row 11, col 1 | left row 16, col 1 (beside **D7**) |
+| Collector wire, right block (insulated) | row 11, col 12, down to row 14, left along row 14 to left col 2, down to row 19 | left row 19, col 2 (beside **D10**) |
 
 The sleeve of each jack has no wire on this board: it goes to GND on the connector board.
 
