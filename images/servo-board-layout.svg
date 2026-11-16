@@ -413,38 +413,38 @@
 <text x="574" y="736" font-size="10" fill="#111111" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">GND</text>
 <text x="622" y="736" font-size="10" fill="#111111" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">GND</text>
 <text x="646" y="736" font-size="10" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">+5</text>
-<rect x="320" y="478" width="172" height="194" rx="5" fill="#f4f6f8" fill-opacity="0.93" stroke="#111111" stroke-width="2.4"/>
-<rect x="389.0" y="650" width="34" height="26" fill="#d9dde2" stroke="#111111" stroke-width="1.5"/>
-<text x="406.0" y="690" font-size="11" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">USB</text>
-<text x="406.0" y="575.0" font-size="14" fill="#111111" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">XIAO</text>
-<circle cx="334" cy="490" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
-<text x="342" y="494" font-size="10" fill="#1e8449" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D7</text>
-<circle cx="478" cy="490" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
-<text x="470" y="494" font-size="10" fill="#999" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D6</text>
-<circle cx="334" cy="514" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
-<text x="342" y="518" font-size="10" fill="#999" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D8</text>
-<circle cx="478" cy="514" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
-<text x="470" y="518" font-size="10" fill="#999" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D5</text>
-<circle cx="334" cy="538" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
-<text x="342" y="542" font-size="10" fill="#999" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D9</text>
-<circle cx="478" cy="538" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
-<text x="470" y="542" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D4</text>
-<circle cx="334" cy="562" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
-<text x="342" y="566" font-size="10" fill="#1e8449" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D10</text>
-<circle cx="478" cy="562" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
-<text x="470" y="566" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D3</text>
-<circle cx="334" cy="586" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
-<text x="342" y="590" font-size="10" fill="#999" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">3V3</text>
-<circle cx="478" cy="586" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
-<text x="470" y="590" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D2</text>
-<circle cx="334" cy="610" r="4.4" fill="#fff" stroke="#111111" stroke-width="2"/>
-<text x="342" y="614" font-size="10" fill="#111111" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">GND</text>
-<circle cx="478" cy="610" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
-<text x="470" y="614" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D1</text>
-<circle cx="334" cy="634" r="4.4" fill="#fff" stroke="#c0392b" stroke-width="2"/>
-<text x="342" y="638" font-size="10" fill="#c0392b" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">5V</text>
-<circle cx="478" cy="634" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
-<text x="470" y="638" font-size="10" fill="#999" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D0</text>
+<rect x="344" y="478" width="172" height="194" rx="5" fill="#f4f6f8" fill-opacity="0.93" stroke="#111111" stroke-width="2.4"/>
+<rect x="413.0" y="650" width="34" height="26" fill="#d9dde2" stroke="#111111" stroke-width="1.5"/>
+<text x="430.0" y="690" font-size="11" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">USB</text>
+<text x="430.0" y="575.0" font-size="14" fill="#111111" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">XIAO</text>
+<circle cx="358" cy="490" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
+<text x="366" y="494" font-size="10" fill="#1e8449" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D7</text>
+<circle cx="502" cy="490" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
+<text x="494" y="494" font-size="10" fill="#999" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D6</text>
+<circle cx="358" cy="514" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
+<text x="366" y="518" font-size="10" fill="#999" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D8</text>
+<circle cx="502" cy="514" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
+<text x="494" y="518" font-size="10" fill="#999" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D5</text>
+<circle cx="358" cy="538" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
+<text x="366" y="542" font-size="10" fill="#999" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D9</text>
+<circle cx="502" cy="538" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
+<text x="494" y="542" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D4</text>
+<circle cx="358" cy="562" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
+<text x="366" y="566" font-size="10" fill="#1e8449" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D10</text>
+<circle cx="502" cy="562" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
+<text x="494" y="566" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D3</text>
+<circle cx="358" cy="586" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
+<text x="366" y="590" font-size="10" fill="#999" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">3V3</text>
+<circle cx="502" cy="586" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
+<text x="494" y="590" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D2</text>
+<circle cx="358" cy="610" r="4.4" fill="#fff" stroke="#111111" stroke-width="2"/>
+<text x="366" y="614" font-size="10" fill="#111111" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">GND</text>
+<circle cx="502" cy="610" r="4.4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
+<text x="494" y="614" font-size="10" fill="#1e8449" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D1</text>
+<circle cx="358" cy="634" r="4.4" fill="#fff" stroke="#c0392b" stroke-width="2"/>
+<text x="366" y="638" font-size="10" fill="#c0392b" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">5V</text>
+<circle cx="502" cy="634" r="4.4" fill="#fff" stroke="#999" stroke-width="2"/>
+<text x="494" y="638" font-size="10" fill="#999" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">D0</text>
 <rect x="286" y="160" width="144" height="44" fill="#fff" stroke="#111111" stroke-width="2.2"/>
 <text x="358.0" y="187" font-size="12" fill="#111111" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">5V BUCK</text>
 <rect x="114" y="68" width="36" height="20" rx="4" fill="#fff" stroke="#1f4e8c" stroke-width="2"/>
@@ -611,15 +611,15 @@
 <line x1="310" y1="610" x2="262" y2="610" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
 <circle cx="310" cy="610" r="3.8" fill="#111111"/>
 <circle cx="262" cy="610" r="3.8" fill="#111111"/>
-<line x1="310" y1="706" x2="310.0" y2="679.0" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/>
-<line x1="310.0" y1="661.0" x2="310" y2="634" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/>
-<polygon points="319.0,679.0 301.0,679.0 310.0,661.0" fill="#fff" stroke="#c0392b" stroke-width="2"/>
-<line x1="319.0" y1="661.0" x2="301.0" y2="661.0" stroke="#c0392b" stroke-width="2.4" stroke-linecap="round"/>
-<circle cx="310" cy="706" r="3.2" fill="#c0392b"/>
-<circle cx="310" cy="634" r="3.2" fill="#c0392b"/>
-<text x="284.0" y="674.0" font-size="10" fill="#c0392b" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">1N5819</text>
-<line x1="286" y1="706" x2="190" y2="706" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="286" cy="706" r="3.8" fill="#c0392b"/>
+<line x1="334" y1="706" x2="334.0" y2="679.0" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/>
+<line x1="334.0" y1="661.0" x2="334" y2="634" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/>
+<polygon points="343.0,679.0 325.0,679.0 334.0,661.0" fill="#fff" stroke="#c0392b" stroke-width="2"/>
+<line x1="343.0" y1="661.0" x2="325.0" y2="661.0" stroke="#c0392b" stroke-width="2.4" stroke-linecap="round"/>
+<circle cx="334" cy="706" r="3.2" fill="#c0392b"/>
+<circle cx="334" cy="634" r="3.2" fill="#c0392b"/>
+<text x="308.0" y="674.0" font-size="10" fill="#c0392b" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">1N5819</text>
+<line x1="334" y1="706" x2="190" y2="706" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="334" cy="706" r="3.8" fill="#c0392b"/>
 <circle cx="190" cy="706" r="3.8" fill="#c0392b"/>
 <line x1="275" y1="634" x2="275.0" y2="625.2" stroke="#111111" stroke-width="2" stroke-linecap="round"/>
 <line x1="275.0" y1="618.8" x2="275" y2="610" stroke="#111111" stroke-width="2" stroke-linecap="round"/>
@@ -635,20 +635,20 @@
 <circle cx="297" cy="634" r="3.2" fill="#111111"/>
 <circle cx="297" cy="610" r="3.2" fill="#111111"/>
 <text x="264" y="625.0" font-size="9" fill="#666666" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">100µ + 100n</text>
-<circle cx="502" cy="610" r="4" fill="#1e8449"/>
-<polyline points="502,610 690,610" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="526" cy="610" r="4" fill="#1e8449"/>
+<polyline points="526,610 690,610" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <rect x="690" y="600" width="22" height="20" rx="4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
 <text x="701.0" y="614" font-size="11" fill="#1e8449" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">S1</text>
-<circle cx="502" cy="586" r="4" fill="#1e8449"/>
-<polyline points="502,586 690,586" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="526" cy="586" r="4" fill="#1e8449"/>
+<polyline points="526,586 690,586" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <rect x="690" y="576" width="22" height="20" rx="4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
 <text x="701.0" y="590" font-size="11" fill="#1e8449" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">S2</text>
-<circle cx="502" cy="562" r="4" fill="#1e8449"/>
-<polyline points="502,562 690,562" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="526" cy="562" r="4" fill="#1e8449"/>
+<polyline points="526,562 690,562" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <rect x="690" y="552" width="22" height="20" rx="4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
 <text x="701.0" y="566" font-size="11" fill="#1e8449" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">S3</text>
-<circle cx="502" cy="538" r="4" fill="#1e8449"/>
-<polyline points="502,538 690,538" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="526" cy="538" r="4" fill="#1e8449"/>
+<polyline points="526,538 690,538" fill="none" stroke="#1e8449" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <rect x="690" y="528" width="22" height="20" rx="4" fill="#fff" stroke="#1e8449" stroke-width="2"/>
 <text x="701.0" y="542" font-size="11" fill="#1e8449" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">S4</text>
 <polyline points="646,274 690,274" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
