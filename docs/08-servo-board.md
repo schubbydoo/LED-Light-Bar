@@ -174,23 +174,28 @@ rounded tag in the layout (`12V+`, `J1.T`, `S1`, `+5V` and so on) is a wire to t
 
 ![Connector board](../images/servo-board-connectors.png)
 
-**What I assumed from the photo of the light-bar board** (count against your own board before soldering;
-the layout is relative to the XIAO, so a column or two of difference only shifts things):
+**The board, from the photos of both sides** (a BusBoard SB400-style board):
 
-- Two vertical rail strips on each side. Rows run left-right and are **cut at the centre channel**, so every
-  row is two separate nets: the left half (columns 1–6) and the right half (columns 7–12). A part that
-  straddles the channel (like the diode in your photo) joins the two halves.
-- Rows are numbered from the top in the drawing. The layout needs **21 rows**, so a board of about 28 rows can be cut
-  after row 21 (about 0.7" off the bottom end) and the offcut used for the connector board.
-- Rails: **inner strip (next to the holes) = GND, outer strip = +5 V**, on both sides.
+- **Three continuous strips down each side:** two bus strips close together (A outer, B), a gap, then a third (C)
+  right next to the holes. They are separate nets, so they can be used for different things.
+- **Every row is split into three islands: 5 holes | 2 holes | 5 holes.** The 2-hole island in the middle is its own
+  net (drawn as a lighter pad in the layout). The XIAO's pins land one in each 5-hole island, so its body sits over the
+  middle one.
+- About 30 rows along the strips. The layout needs **21**, so the board can be cut after row 21 (about 0.9" off the end)
+  and the offcut used for the connector board. Cut through a gap in the copper, not along a strip.
+
+**How I used the strips (both sides, mirrored):** A = **+5 V**; B and C = **GND**, tied together with a short wire at
+row 1 and row 20 so the ground has two strips of copper, and so every ground connection has a strip right beside the
+holes. The 1000 µF sits across A and B, which are adjacent.
 
 **Why the XIAO is turned so the USB end points at the bottom:** the four servo pins D1–D4 are on the right edge
-of the XIAO and the sensor pins D7 and D10 are on the left. The sensor circuit for D7 sits in the left half and the
-one for D10 in the right half, as mirror images, so the two blocks are built the same way and each collector wire is
+of the XIAO and the sensor pins D7 and D10 are on the left. The sensor circuit for D7 sits in the left island and the
+one for D10 in the right island, as mirror images, so the two blocks are built the same way and each collector wire is
 short. Rotate the whole board 180° in the box if the USB end should face elsewhere.
 
-**XIAO position:** left pins in left-half column 3, right pins in right-half column 10, rows 11–17. Holes
-at left columns 1–2 and right columns 11–12 stay free beside the pins. The sensor blocks sit above it in rows 2–7.
+**XIAO position:** left pins in column 3 of the left island, right pins in column 3 of the right island (columns
+1–5 left, 6–7 middle, 8–12 right, so these are columns 3 and 10), rows 11–17. Columns 1–2 and 11–12 stay free beside
+the pins. The sensor blocks sit above it in rows 2–7.
 
 | Rows | Left pin | Right pin |
 |---|---|---|
@@ -202,37 +207,38 @@ at left columns 1–2 and right columns 11–12 stay free beside the pins. The s
 | 16 | GND | **D1** servo 1 |
 | 17 | 5V | D0 (avoid) |
 
-### Hole list (row, side-column; `L`/`R` = left/right half, rail = `L5 LG R5 RG`)
+### Hole list (row, column; the left island is columns 1–5, the right island 8–12; strips are `A`, `B`, `C`, left or right)
 
 **12 V side, off the board.** The 12 V parts sit above the buck module and the 5 V side below it, so the
 buck is the only thing between them: barrel jack + → PTC fuse → 1N5822 (band toward the buck) → buck IN+,
 with the 100 µF 25 V and the TVS (P6KE15A, band to +) from that node to GND, and jack GND → buck IN−. Build
 it on the buck's own bit of board or wire it point to point. Nothing from this chain goes on the SB400 board.
 
-**5 V side, on the board**
+**Strips and bridges**
 
 | Part | From | To |
 |---|---|---|
-| Buck OUT+ / OUT− | L5 rail row 1 | LG rail row 1 |
-| Bridge GND (wire) | LG rail row 1 | RG rail row 1 |
-| Bridge +5 V (wire) | L5 rail row 8 | R5 rail row 8 |
-| 1000 µF 10 V+ (+ to outer rail) | R5 rail row 21 | RG rail row 21 |
+| Buck OUT+ | left A, row 1 | |
+| Buck OUT− | left B, row 1 | |
+| B-to-C ground jumpers (4 short wires) | left B and C, rows 1 and 20 | right B and C, rows 1 and 20 |
+| Bridge GND (wire) | left C, row 1 | right C, row 1 |
+| Bridge +5 V (wire) | left A, row 8 | right A, row 8 |
+| 1000 µF 10 V+ (+ to A) | right A, row 21 | right B, row 21 |
 
-Bridge the rails with wire, not just the strips: four stalled servos draw about 1.9 A.
+Bridge the sides with wire, not just the strips: four stalled servos draw about 1.9 A.
 
 **Sensor circuits (two mirror-image blocks, rows 2–7).** The left block serves sensor 1 and goes to **D7**; the
-right block serves sensor 2 and goes to **D10**. Columns are counted from the block's own rail: "k1" is the hole
-next to the rail, k6 the hole nearest the channel. Rows: **2 feed, 3 tip, 4 ring, 5 GND, 6 base, 7 collector.**
-The dashed lines in the drawing are the copper strips that join holes in a row, not wires. Nothing of the same
+right block serves sensor 2 and goes to **D10**. Columns are counted from the block's own side: "k1" is the hole
+next to strip C, k5 the hole nearest the middle island. Rows: **2 feed, 3 tip, 4 ring, 5 GND, 6 base, 7 collector.**
+The dashed lines in the drawing are the copper that joins holes in a row, not wires. Nothing of the same
 colour crosses: the collector wire leaves downward from row 7, below the ring wire.
 
 | Part | From | To |
 |---|---|---|
-| +5 V feed wire | outer rail, row 2 | row 2, k3 |
+| +5 V feed wire | A, row 2 | row 2, k3 |
 | 22 Ω (stands vertically) | row 2, k3 | row 3, k3 |
-| 4.7 µF (+ to row 3) | row 3, k5 | row 5, k5 |
-| 100 nF | row 3, k6 | row 5, k6 |
-| GND jumper | inner rail, row 5 | row 5, k1 |
+| 4.7 µF (+ to row 3) and 100 nF, side by side in the same two holes | row 3, k5 | row 5, k5 |
+| GND jumper | C, row 5 | row 5, k1 |
 | 2N3904 standing in k2 | emitter row 5, base row 6, collector row 7 | |
 | 1 kΩ (lies along the column, 0.2") | row 4, k3 | row 6, k3 |
 | 100 kΩ (stands vertically) | row 5, k4 | row 6, k4 |
@@ -247,13 +253,13 @@ The sleeve of each jack has no wire on this board: it goes to GND on the connect
 
 | Part | From | To |
 |---|---|---|
-| GND jumper | L16 col 2 | LG rail row 16 |
-| 1N5819 (band to the XIAO) | cathode L17 col 2 | anode L21 col 2 |
-| Anode jumper | L21 col 1 | L5 rail row 21 |
-| 100 µF (+ to row 17) and 100 nF | L17 col 1 | L16 col 1 |
-| Tags `S1`, `S2`, `S3`, `S4` | R16 / R15 / R14 / R13, col 11 | |
-| Tag `+5V` (20 AWG) | R5 rail row 18 | |
-| Tag `GND` (20 AWG) | RG rail row 19 | |
+| GND jumper | left row 16, col 2 | left C, row 16 |
+| 1N5819 (band to the XIAO) | cathode left row 17, col 2 | anode left row 21, col 2 |
+| Anode jumper | left row 21, col 1 | left A, row 21 |
+| 100 µF (+ to row 17) and 100 nF, side by side | left row 17, col 1 | left row 16, col 1 |
+| Tags `S1`, `S2`, `S3`, `S4` | right rows 16 / 15 / 14 / 13, col 11 | |
+| Tag `+5V` (20 AWG) | right A, row 18 | |
+| Tag `GND` (20 AWG) | right C, row 19 | |
 
 **Wires between the two boards (10 plus the 12 V pair).** `S1`–`S4`, `J1.T`, `J1.R`, `J2.T`, `J2.R`, and one
 `+5V` and one `GND` (20 AWG, they carry every servo's current). `12V+` and `12V−` go from the jack to the 12 V chain
