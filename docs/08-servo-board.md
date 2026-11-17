@@ -246,7 +246,7 @@ colour crosses: the collector wire leaves downward from row 8, below the ring wi
 | 4.7 µF (+ to row 4), a barrel | row 4, k5 | row 6, k5 |
 | 100 nF (+ to row 4 if it is an electrolytic) | row 4, k3 | row 6, k3 |
 | GND jumper (shares the emitter hole) | C, row 6 | row 6, k1 |
-| 2N3904 standing in k1 | emitter row 6, base row 7, collector row 8 | |
+| 2N3904 standing in k1 (both blocks the same way: **flat face toward the left edge of the board**, legs E, B, C running down rows 6, 7, 8) | emitter row 6, base row 7, collector row 8 | |
 | 1 kΩ (lies along the column, 0.2") | row 5, k2 | row 7, k2 |
 | 100 kΩ (stands vertically; its top leg shares the 100 nF's row 6 hole) | row 6, k3 | row 7, k3 |
 | Tag `J1.T` / `J2.T` | row 4, k1 | |

@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 846 766" width="846" height="766">
-<rect width="846" height="766" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 846 790" width="846" height="790">
+<rect width="846" height="790" fill="#fff"/>
 <rect x="176" y="236" width="484" height="484" rx="6" fill="#efe9c9" stroke="#111111" stroke-width="2"/>
 <rect x="180" y="240" width="20" height="476" fill="#f3c9c3"/>
 <rect x="204" y="240" width="20" height="476" fill="#cfcfcf"/>
@@ -413,6 +413,7 @@
 <text x="574" y="736" font-size="10" fill="#111111" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">GND</text>
 <text x="622" y="736" font-size="10" fill="#111111" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">GND</text>
 <text x="646" y="736" font-size="10" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">+5</text>
+<text x="418.0" y="760" font-size="10" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">Both 2N3904s stand the same way: flat face toward the LEFT edge, legs E, B, C = rows 6, 7, 8 (top to bottom)</text>
 <rect x="344" y="478" width="172" height="194" rx="5" fill="#f4f6f8" fill-opacity="0.93" stroke="#111111" stroke-width="2.4"/>
 <rect x="413.0" y="650" width="34" height="26" fill="#d9dde2" stroke="#111111" stroke-width="1.5"/>
 <text x="430.0" y="690" font-size="11" fill="#666666" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">USB</text>
@@ -578,17 +579,17 @@
 <polyline points="526,346 526.0,351.0 521.8,354.1666666666667 530.2,360.5 521.8,366.8333333333333 530.2,373.1666666666667 521.8,379.5 530.2,385.8333333333333 526.0,389.0 526,394" fill="none" stroke="#1e8449" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="526" cy="346" r="3.2" fill="#1e8449"/>
 <circle cx="526" cy="394" r="3.2" fill="#1e8449"/>
-<text x="539.0" y="387.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">1k</text>
+<text x="512.0" y="387.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">1k</text>
 <polyline points="502,370 502.0,374.32 497.8,375.6 506.2,378.15999999999997 497.8,380.72 506.2,383.28 497.8,385.84000000000003 506.2,388.4 502.0,389.68 502,394" fill="none" stroke="#1e8449" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="502" cy="370" r="3.2" fill="#1e8449"/>
 <circle cx="502" cy="394" r="3.2" fill="#1e8449"/>
 <text x="482.0" y="386.0" font-size="10" fill="#1e8449" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">100k</text>
-<line x1="550" y1="394" x2="559" y2="394" stroke="#111111" stroke-width="2" stroke-linecap="round"/>
-<line x1="559" y1="382" x2="559" y2="406" stroke="#111111" stroke-width="3" stroke-linecap="round"/>
-<line x1="559" y1="388" x2="550" y2="370" stroke="#111111" stroke-width="2" stroke-linecap="round"/>
-<line x1="559" y1="400" x2="550" y2="418" stroke="#111111" stroke-width="2" stroke-linecap="round"/>
+<line x1="550" y1="394" x2="541" y2="394" stroke="#111111" stroke-width="2" stroke-linecap="round"/>
+<line x1="541" y1="382" x2="541" y2="406" stroke="#111111" stroke-width="3" stroke-linecap="round"/>
+<line x1="541" y1="388" x2="550" y2="370" stroke="#111111" stroke-width="2" stroke-linecap="round"/>
+<line x1="541" y1="400" x2="550" y2="418" stroke="#111111" stroke-width="2" stroke-linecap="round"/>
 
-<polygon points="550.0,370.0 555.9032194605994,373.75659420219966 549.4633436854,376.9765320897994" fill="#111111"/>
+<polygon points="550.0,370.0 550.5366563146,376.9765320897994 544.0967805394006,373.75659420219966" fill="#111111"/>
 <circle cx="550" cy="370" r="3.2" fill="#111111"/>
 <circle cx="550" cy="394" r="3.2" fill="#111111"/>
 <circle cx="550" cy="418" r="3.2" fill="#111111"/>
