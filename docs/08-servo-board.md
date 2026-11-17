@@ -235,21 +235,23 @@ take that current straight from the bridges, which is why nothing heavy runs dow
 **Sensor circuits (two mirror-image blocks, rows 3–8).** The left block serves sensor 1 and goes to **D7**; the
 right block serves sensor 2 and goes to **D10**. Columns are counted from the block's own side: "k1" is the hole
 next to strip C, k5 the hole nearest the middle island. Rows: **3 feed, 4 tip, 5 ring, 6 GND, 7 base, 8 collector.**
-The dashed lines in the drawing are the copper that joins holes in a row, not wires. Nothing of the same
+The dashed lines in the drawing are the copper that joins holes in a row, not wires. Column k4 is left empty
+between the two filter caps so two barrels fit side by side. Nothing of the same
 colour crosses: the collector wire leaves downward from row 8, below the ring wire.
 
 | Part | From | To |
 |---|---|---|
-| +5 V feed wire | A, row 3 | row 3, k3 |
-| 22 Ω (stands vertically) | row 3, k3 | row 4, k3 |
-| 4.7 µF (+ to row 4) and 100 nF, side by side in the same two holes | row 4, k5 | row 6, k5 |
-| GND jumper | C, row 6 | row 6, k1 |
-| 2N3904 standing in k2 | emitter row 6, base row 7, collector row 8 | |
-| 1 kΩ (lies along the column, 0.2") | row 5, k3 | row 7, k3 |
-| 100 kΩ (stands vertically) | row 6, k4 | row 7, k4 |
+| +5 V feed wire | A, row 3 | row 3, k2 |
+| 22 Ω (stands vertically) | row 3, k2 | row 4, k2 |
+| 4.7 µF (+ to row 4), a barrel | row 4, k5 | row 6, k5 |
+| 100 nF (+ to row 4 if it is an electrolytic) | row 4, k3 | row 6, k3 |
+| GND jumper (shares the emitter hole) | C, row 6 | row 6, k1 |
+| 2N3904 standing in k1 | emitter row 6, base row 7, collector row 8 | |
+| 1 kΩ (lies along the column, 0.2") | row 5, k2 | row 7, k2 |
+| 100 kΩ (stands vertically; its top leg shares the 100 nF's row 6 hole) | row 6, k3 | row 7, k3 |
 | Tag `J1.T` / `J2.T` | row 4, k1 | |
 | Tag `J1.R` / `J2.R` | row 5, k1 | |
-| Collector wire, left block (insulated, down column 1) | row 8, col 1 | left row 11, col 1 (beside **D7**) |
+| Collector wire, left block (insulated, down column 1, from the transistor's collector hole) | row 8, col 1 | left row 11, col 1 (beside **D7**) |
 | Collector wire, right block (insulated) | row 8, col 12, down to row 9, left along row 9 to left col 2, down to row 14 | left row 14, col 2 (beside **D10**) |
 
 The sleeve of each jack has no wire on this board: it goes to GND on the connector board.
@@ -258,10 +260,11 @@ The sleeve of each jack has no wire on this board: it goes to GND on the connect
 
 | Part | From | To |
 |---|---|---|
-| GND jumper | left row 16, col 2 | left C, row 16 |
+| GND jumper (shares the 100 µF's − hole) | left row 16, col 1 | left C, row 16 |
 | 1N5819 (band to the XIAO; bend the leads to 0.3") | cathode left row 17, col 3 | anode left row 20, col 3 |
 | Anode jumper | left row 20, col 3 | left A, row 20 |
-| 100 µF (+ to row 17) and 100 nF, side by side | left row 17, col 1 | left row 16, col 1 |
+| 100 µF (+ to row 17), a barrel | left row 17, col 1 | left row 16, col 1 |
+| 100 nF (+ to row 17 if it is an electrolytic); its + hole is shared with the 1N5819 cathode | left row 17, col 3 | left row 16, col 3 |
 | Tags `S1`, `S2`, `S3`, `S4` | right rows 16 / 15 / 14 / 13, col 11 | |
 
 **Wires between the two boards (10 plus the 12 V pair).** `S1`–`S4`, `J1.T`, `J1.R`, `J2.T`, `J2.R`, and one
