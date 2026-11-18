@@ -186,9 +186,9 @@ rounded tag in the layout (`12V+`, `J1.T`, `S1`, `+5V` and so on) is a wire to t
 
 **How I used the strips (both sides, mirrored):** A = **+5 V**; B and C = **GND**, tied together with a short wire at
 row 1 so every ground connection has a strip right beside the holes. The 1000 µF sits across A and B, which are
-adjacent. **Both bus connections are across the top:** the GND bridge on row 1 and the +5 V bridge on row 2, and the
-`+5V` and `GND` tags to the connector board leave from those same rows. That means the heavy servo current never
-runs down the strips, so no ground jumper is needed near the XIAO.
+adjacent. **Each side is fed straight from the buck:** the buck has two OUT+ and two OUT− pads, so one pair goes to the left
+strips and the other pair to the right strips, and no wire bridges the two sides. The `+5V` and `GND` tags to the
+connector board leave from the right-hand strips at the top, so the heavy servo current never runs down a strip.
 
 **Why the XIAO is turned so the USB end points at the bottom:** the four servo pins D1–D4 are on the right edge
 of the XIAO and the sensor pins D7 and D10 are on the left. The sensor circuit for D7 sits in the left island and the
@@ -216,21 +216,22 @@ buck is the only thing between them: barrel jack + → PTC fuse → 1N5822 (band
 with the 100 µF 25 V and the TVS (P6KE15A, band to +) from that node to GND, and jack GND → buck IN−. Build
 it on the buck's own bit of board or wire it point to point. Nothing from this chain goes on the SB400 board.
 
-**Strips and bridges**
+**Strips and buck feed**
 
 | Part | From | To |
 |---|---|---|
-| Buck OUT+ | left A, row 1 | |
-| Buck OUT− | left B, row 1 | |
+| Buck OUT+ (first pad) | left A, row 1 | |
+| Buck OUT− (first pad) | left B, row 1 | |
+| Buck OUT+ (second pad) | right A, row 1 | |
+| Buck OUT− (second pad) | right B, row 1 | |
 | B-to-C ground jumpers (2 short wires) | left B to left C, row 1 | right B to right C, row 1 |
-| Bridge GND (wire) | left C, row 1 | right C, row 1 |
-| Bridge +5 V (wire) | left A, row 2 | right A, row 2 |
 | 1000 µF 10 V+ (+ to A) | right A, row 10 | right B, row 10 |
 | Tag `GND` (20 AWG) | right C, row 1 | |
 | Tag `+5V` (20 AWG) | right A, row 2 | |
 
-Bridge the sides with wire, not just the strips: four stalled servos draw about 1.9 A. The two 20 AWG tag wires
-take that current straight from the bridges, which is why nothing heavy runs down a strip.
+Four stalled servos draw about 1.9 A. The two 20 AWG tag wires take that current from the right-hand strips right
+where the buck feeds them, which is why nothing heavy runs down a strip. A GND wire between left C and right C is no
+longer needed; if you already fitted one, it does no harm.
 
 **Sensor circuits (two mirror-image blocks, rows 3–8).** The left block serves sensor 1 and goes to **D7**; the
 right block serves sensor 2 and goes to **D10**. Columns are counted from the block's own side: "k1" is the hole
@@ -272,7 +273,7 @@ The sleeve of each jack has no wire on this board: it goes to GND on the connect
 above the buck, not to the main board. On the connector board the four servo + pins join one +5V bus, and the
 servo − pins and both jack sleeves join one GND bus.
 
-**Soldering order that keeps things reachable:** rails and bridge wires, then the two sensor blocks, then the diode and caps beside the XIAO, then the XIAO last (it covers the
+**Soldering order that keeps things reachable:** the buck feed wires and strip jumpers, then the two sensor blocks, then the diode and caps beside the XIAO, then the XIAO last (it covers the
 holes under it). Meter each rail for continuity to the far end, and meter across the channel on a spare row
 to confirm the halves are isolated, before the XIAO goes in.
 

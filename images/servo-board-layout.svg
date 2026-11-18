@@ -495,8 +495,16 @@
 <polyline points="334,204 334,226 214,226 214,250" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="334" cy="204" r="4" fill="#111111"/>
 <circle cx="214" cy="250" r="3.8" fill="#111111"/>
-<text x="304" y="216" font-size="9" fill="#c0392b" text-anchor="end" font-weight="normal" font-family="Helvetica,Arial,sans-serif">OUT+</text>
-<text x="340" y="216" font-size="9" fill="#111111" text-anchor="start" font-weight="normal" font-family="Helvetica,Arial,sans-serif">OUT−</text>
+<polyline points="406,204 406,216 646,216 646,250" fill="none" stroke="#c0392b" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="406" cy="204" r="4" fill="#c0392b"/>
+<circle cx="646" cy="250" r="3.8" fill="#c0392b"/>
+<polyline points="382,204 382,226 622,226 622,250" fill="none" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="382" cy="204" r="4" fill="#111111"/>
+<circle cx="622" cy="250" r="3.8" fill="#111111"/>
+<text x="310" y="196" font-size="8" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">OUT+</text>
+<text x="334" y="196" font-size="8" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">OUT−</text>
+<text x="382" y="196" font-size="8" fill="#111111" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">OUT−</text>
+<text x="406" y="196" font-size="8" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="Helvetica,Arial,sans-serif">OUT+</text>
 <line x1="286" y1="322" x2="382" y2="322" stroke="#c0392b" stroke-width="1.3" stroke-dasharray="3 3" opacity="0.7"/>
 <line x1="286" y1="346" x2="310" y2="346" stroke="#1e8449" stroke-width="1.3" stroke-dasharray="3 3" opacity="0.7"/>
 <line x1="286" y1="370" x2="382" y2="370" stroke="#111111" stroke-width="1.3" stroke-dasharray="3 3" opacity="0.7"/>
@@ -658,12 +666,6 @@
 <circle cx="574" cy="250" r="4.5" fill="#111111"/>
 <rect x="690" y="240" width="29" height="20" rx="4" fill="#fff" stroke="#111111" stroke-width="2"/>
 <text x="704.5" y="254" font-size="11" fill="#111111" text-anchor="middle" font-weight="bold" font-family="Helvetica,Arial,sans-serif">GND</text>
-<line x1="190" y1="274" x2="646" y2="274" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="190" cy="274" r="3.8" fill="#c0392b"/>
-<circle cx="646" cy="274" r="3.8" fill="#c0392b"/>
-<line x1="262" y1="250" x2="574" y2="250" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="262" cy="250" r="3.8" fill="#111111"/>
-<circle cx="574" cy="250" r="3.8" fill="#111111"/>
 <line x1="214" y1="250" x2="262" y2="250" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
 <circle cx="214" cy="250" r="3.8" fill="#111111"/>
 <circle cx="262" cy="250" r="3.8" fill="#111111"/>
