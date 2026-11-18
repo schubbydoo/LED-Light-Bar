@@ -711,6 +711,15 @@ static String sensString() {
 
 static void reply(const String& m) { Serial.println(m); linkSend(m); }
 
+// What this board HAS, as opposed to what it is doing: the ports on the hardware
+// (4 servo headers, 2 sensor inputs) and how many servos are being driven now.
+// The wire carries numbers only; the box names them ("Servo 1", "Sensor 2") and
+// knows from the `jaw>` tag that they are on the remote board, not its own.
+static String capsLine() {
+  return "caps dev=jaw v=1 servos=" + String(MAX_CH) + " driven=" + String(nch)
+       + " sensors=" + String(N_SENSORS) + " sens=" + sensString();
+}
+
 static String knobValue(Chan& c, int i) {
   char b[16];
   snprintf(b, sizeof(b), "%g", *knobPtr(c, KNOBS[i]));
@@ -821,6 +830,11 @@ static void handleLine(String line) {
     return;
   }
 
+  if (verb == "caps") {
+    reply(capsLine());
+    return;
+  }
+
   if (verb == "sens") {
     String o = "sens";
     for (int i = 0; i < N_SENSORS; i++) o += " " + String(i + 1) + "=" + (sensState[i] ? "1" : "0");
@@ -850,6 +864,7 @@ static void handleLine(String line) {
     Serial.println(F("set [<ch>.]<key> <v>    change a setting (see show for keys)"));
     Serial.println(F("save | forget           keep settings across power cycles | back to defaults"));
     Serial.println(F("sens                    the two sensor inputs (1 = active, pin LOW)"));
+    Serial.println(F("caps                    the ports this board has: servos, sensors (also sent once at boot)"));
     Serial.println(F("channels <1..4>         how many servos this board drives"));
     Serial.println(F("mode <ch> speech|manual   slot <ch> <n> <deg> <speed>|clear"));
     Serial.println(F("go <ch> <n>             go to position slot n   auto <ch> on|off"));
@@ -1174,6 +1189,7 @@ void setup() {
   Serial.println(F("commands : show | st | set <k> <v> | speak <s> | hold <deg> | go <ch> <n> | help"));
   Serial.println(F("On a speech channel, idle is speech with a zero envelope."));
   Serial.println(F("=========================================================="));
+  linkSend(capsLine());                      // unasked, once, so a box that is listening learns the ports
 }
 
 void loop() {

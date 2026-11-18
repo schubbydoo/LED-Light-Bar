@@ -157,7 +157,16 @@ unasked over the radio:
 Each event goes out 3 times, 40 ms apart, with the same `seq`; the receiver ignores a repeat of
 the same (n, state, seq). The bridge needs no change: it already prints anything a prop says,
 tagged `jaw>`. `sens` reads the two inputs back (`sens 1=0 2=0`) and `st` carries `sens=00`.
-**Not done:** the SFX Box does not yet read unsolicited `ev` lines or offer them as triggers.
+**What the board says it has.** `caps` (and once, unasked, at boot) answers
+
+    caps dev=jaw v=1 servos=4 driven=<n> sensors=2 sens=<n1><n2>
+
+`servos` is the number of servo headers on the board (always 4), `driven` how many the firmware drives right now
+(`channels <n>`), `sensors` the sensor inputs (always 2), `sens` their current states (1 = active). The wire carries
+numbers only. The box names them Servo 1..4 and Sensor 1..2 and, because the line arrives tagged `jaw>`, shows them as
+belonging to the remote prop, apart from the box's own onboard sensor ports.
+
+**Not done:** the SFX Box does not yet read unsolicited `ev` or `caps` lines or offer them as triggers.
 
 Bench test without the circuit: the pins idle HIGH, so touching a wire from D7 or D10 to GND
 looks like motion.
