@@ -182,7 +182,7 @@ connectors are on the main board, so `J1.T` and `J1.R` are just wires between th
 - **Every row is split into three islands: 5 holes | 2 holes | 5 holes.** The 2-hole island in the middle is its own
   net (drawn as a lighter pad in the layout). The XIAO's pins land one in each 5-hole island, so its body sits over the
   middle one.
-- About 30 rows along the strips. The layout needs **28**, so the board can be cut after row 28 (a couple of rows off the end)
+- About 30 rows along the strips. The layout needs **26**, so the board can be cut after row 26 (a couple of rows off the end)
   and the offcut used for the connector board. Cut through a gap in the copper, not along a strip.
 
 **How I used the strips (both sides, mirrored):** A = **+5 V**; B and C = **GND**, tied together with a short wire at
@@ -199,7 +199,7 @@ short. Rotate the whole board 180° in the box if the USB end should face elsewh
 **XIAO position:** the XIAO is 7 columns wide. Its left pins are in column 4 of the left island and its right pins in column 10 (columns
 1–5 left, 6–7 middle, 8–12 right), rows 14–20. That leaves **three free holes on the left** (columns 1–3, where the
 power parts are) and **two on the right** (columns 11–12). The sensor blocks sit above it in rows 3–14. The two
-sensor connectors (3-pin, on the board) are below it in rows 25–27.
+sensor connectors (3-pin, on the board) are below it in rows 23–25.
 
 | Rows | Left pin | Right pin |
 |---|---|---|
@@ -257,26 +257,25 @@ in a row, not wires. Column k4 is left empty between the two filter caps so two 
 | Collector, left block | no wire: the collector leg sits in row 14, the same row as **D7** | |
 | Collector wire, right block (insulated) | row 12, col 12, left along row 12 to left col 3 | left row 17, col 3 (beside **D10**) |
 
-**Sensor connectors, on the board.** Two 3-pin connectors in rows 25–27, wired like the SFX Box's sensor board. The
+**Sensor connectors, on the board.** Two 3-pin connectors in rows 23–25, wired like the SFX Box's sensor board. The
 left one (`J1`, sensor 1) has its pins in column 2, top to bottom **Sleeve, Tip, Ring**. The right one (`J2`, sensor 2)
 has its pins in column 11, top to bottom **Ring, Tip, Sleeve**.
 
 | Pin | Hole J1 (col 2) | Hole J2 (col 11) | Goes to |
 |---|---|---|---|
-| Sleeve | row 25 | row 27 | GND: short wire to C (left C / right C) on the same row |
-| Tip | row 26 | row 26 | tag `J1.T` / `J2.T` (wire to row 6, k1 of that block) |
-| Ring | row 27 | row 25 | tag `J1.R` / `J2.R` (wire to row 7, k1 of that block) |
+| Sleeve | row 23 | row 25 | GND: short wire to C (left C / right C) on the same row |
+| Tip | row 24 | row 24 | tag `J1.T` / `J2.T` (wire to row 6, k1 of that block) |
+| Ring | row 25 | row 23 | tag `J1.R` / `J2.R` (wire to row 7, k1 of that block) |
 
 **XIAO power and servos**
 
 | Part | From | To |
 |---|---|---|
 | GND jumper (XIAO GND pin is row 19) | left row 19, col 1 | left C, row 19 |
-| 100 µF (+ to row 21), a barrel, shares the row 19 jumper hole | left row 21, col 1 | left row 19, col 1 |
-| 100 nF (+ to row 21 if it is an electrolytic) | left row 21, col 3 | left row 19, col 3 |
-| 5 V link (the 5 V pin is row 20, the caps and diode are on row 21) | left row 20, col 5 | left row 21, col 5 |
-| 1N5819 (band to the XIAO; its cathode shares the 100 nF's row 21 hole) | cathode left row 21, col 3 | anode left row 24, col 3 |
-| Anode jumper | left row 24, col 3 | left A, row 24 |
+| 100 µF (+ to row 20), a barrel, shares the row 19 jumper hole | left row 20, col 1 | left row 19, col 1 |
+| 100 nF (+ to row 20 if it is an electrolytic) | left row 20, col 3 | left row 19, col 3 |
+| 1N5819, lying along row 21 (band to the XIAO) | anode left A, row 21 | cathode left row 21, col 3 |
+| 5 V hop (the 5 V pin and the cap + legs are row 20, the diode cathode is row 21) | left row 21, col 3 | left row 20, col 3 |
 | Tags `S1`, `S2`, `S3`, `S4` | right rows 19 / 18 / 17 / 16, col 11 | |
 
 **Wires between the two boards (6 plus the 12 V pair).** `S1`–`S4`, `+5V` and `GND` (20 AWG, they carry every servo's current). `12V+` and `12V−` go from the jack to the 12 V chain
