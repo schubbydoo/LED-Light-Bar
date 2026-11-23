@@ -227,6 +227,12 @@ buck is the only thing between them: barrel jack + → PTC fuse → 1N5822 (band
 with the 100 µF 25 V and the TVS (P6KE15A, band to +) from that node to GND, and jack GND → buck IN−. Build
 it on the buck's own bit of board or wire it point to point. Nothing from this chain goes on the SB400 board.
 
+**Check the TVS before the first plug-in** (battery off, meter in diode mode, across the jack): red on the
+centre pin and black on the sleeve must read **OL**; swapped reads about 0.5 V. The other way round means
+the TVS band is on the GND side, which is a dead short to the battery — it trips the TalentCell's
+protection and its LEDs stay dark (seen on the bench, 2026-11-23: 0.846 V that way, fixed by flipping the TVS).
+The ohms range cannot see this; the test voltage is too low to turn the diode on.
+
 **Strips and buck feed**
 
 | Part | From | To |
