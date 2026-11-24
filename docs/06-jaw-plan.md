@@ -322,5 +322,7 @@ channel and slot NUMBERS only.
 - Channels 2..4 start as manual; channel 1 as speech. Channel 1's saved settings keep their old
   NVS key, so a board tuned before this firmware keeps them.
 - Tested on the bench by serial only: slots, `go`, refusals, `auto` cycling at the set gap,
-  `stop all`, channel 1's saved 90° test config surviving. NOT tested: the multi-line replies over
-  the radio and the bridge, a servo on channels 2..4, speech on two channels at once.
+  `stop all`, channel 1's saved 90° test config surviving. Since then: the multi-line replies go
+  over the radio and the bridge to the box's Servo tab, and on 2026-11-24 all four servos moved on
+  the SB400 servo board (D1..D4, `channels 4` saved; docs/08 §9). NOT tested: speech on two
+  channels at once.

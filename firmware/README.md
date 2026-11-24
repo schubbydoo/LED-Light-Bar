@@ -395,3 +395,12 @@ multi-line `st` replies over the radio; and a real show with both servos, which 
 worked perfectly. **Sync has not been measured** the way the bar's was (±55 ms), no real jaw has
 been tried, and speech on two servos at once is untested, so the swing, attack, release and slew
 defaults are still starting points for tuning by eye.
+
+### Sensors and `caps`
+
+Two sensor ports, D7 (sensor 1) and D10 (sensor 2), the same circuit as the SFX Box's own. Each change
+goes out unasked as `ev sensor <n> <1|0> <seq>` (three copies, 40 ms apart, same seq), and is printed
+on serial too, so `./monitor.sh jaw 45` is the quickest check that a press arrived. `sens` reads them
+back. `caps dev=jaw v=1 servos=4 driven=<n> sensors=2 sens=<n1><n2>` (on request, and once at boot)
+says what the board has; `sens=10` is a state string (sensor 1 active), not a count. The box shows
+both sensors live on its Hardware page. Wiring and bring-up: `docs/08-servo-board.md` §7 and §9.

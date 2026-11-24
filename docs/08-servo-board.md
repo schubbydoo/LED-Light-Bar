@@ -89,6 +89,10 @@ the UART transmit pin and prints boot messages).
 2. Plug the XIAO in alone and check it comes up and answers on the radio.
 3. Plug servos in one at a time. Meter the signal pin on each header with `jaw.ino` running.
 4. Confirm with the meter that the brick's centre-pin polarity matches the board's before use.
+5. With the servos plugged in and powered, meter **between the two GND strips** (and from the XIAO's GND pin to a
+   servo's − pin). It must be under about 0.05 V. A ground the servos return through that is not solidly the XIAO's
+   ground lifts their 0 V, and the 3.3 V signal then reads as ~2 V to the servo, below its threshold: the servos
+   get power and never move. See §9.
 
 ## 5. Still unknown
 
@@ -129,7 +133,7 @@ before ordering.**
 | 15 | Power input | 5.5 × 2.1 mm barrel jack, panel or PCB mount, plus a 2-pin 5.08 mm screw terminal | 1 each | **OWNED** (barrel jacks and screw terminals, SFX BOM) | **meter the brick's polarity**; centre-positive is common, not universal |
 | 16 | Board | perfboard, the size used for the bar | 1 | ? | |
 | 17 | Wire | 20 AWG for the power bus, 22 AWG silicone for signals | — | **[bin?]** (22 AWG) | |
-| 18 | Servos | Smraza S51, 9 g | 2–4 | **yes** (2 on the bench) | |
+| 18 | Servos | Smraza S51, 9 g | 2–4 | **yes** (4 on the bench board) | |
 | 19 | Motion sensor (optional) | HC-SR501 PIR or VL53L1X ToF | 1 | **OWNED** (VL53L1X, SFX BOM); HC-SR501 listed as optional stock | the box handles triggers today; this is only for a standalone board |
 | 19b | Sensor port parts (×2) | 3.5 mm stereo jack, 2N3904, 1 kΩ, 100 kΩ, 22 Ω, 4.7 µF, 100 nF | 2 sets | **?** (the SFX Box's ports use the same parts) | see §7 |
 | 20 | 12 V sources | 12 V brick (5.5 × 2.1 mm) · TalentCell YB1206000 12 V battery | 1 each | **yes** (TalentCell, `05-parts.md`); the brick **OWNED** per the SFX BOM | the box's 12 V PSU is the same class of brick |
@@ -166,10 +170,19 @@ tagged `jaw>`. `sens` reads the two inputs back (`sens 1=0 2=0`) and `st` carrie
 numbers only. The box names them Servo 1..4 and Sensor 1..2 and, because the line arrives tagged `jaw>`, shows them as
 belonging to the remote prop, apart from the box's own onboard sensor ports.
 
-**Not done:** the SFX Box does not yet read unsolicited `ev` or `caps` lines or offer them as triggers.
+**On the SFX Box (its repo, deployed 2026-11-23/24):** it keeps the board's unasked `jaw>` lines, logs each sensor
+change ("servo board: sensor 1 active (event N)"), and ignores any copy of an event it has already seen in the last
+2 s (the 3 copies of consecutive events arrive interleaved, so "ignore a repeat of the last one" was not enough). A
+show step can trigger on `jaw:1` / `jaw:2`, shown as "<prop name> · Sensor N" in an "On the servo board" group, apart
+from the box's own S1–S3. The **Hardware page** shows both under the Sensor card in an "On the servo board" table with
+the same idle / ACTIVE pill as the box's own sensors ("not heard" until the board has spoken), updated from the pushed
+events; the page asks `caps` once on load for the current state. The Servo tab's status line reads "Servos: 4 ·
+Sensors: 2 (Sensor 1 idle, Sensor 2 idle)".
 
 Bench test without the circuit: the pins idle HIGH, so touching a wire from D7 or D10 to GND
-looks like motion.
+looks like motion. **With the circuit built, short Ring to Tip** (what a push button or the sensor does). Shorting
+Tip to Sleeve does nothing: it only pulls the tip node down, and the base is fed from the ring. Bare wires touched by
+hand bounce, so one press can show as several events; a real button or sensor does not.
 
 Parts for the two ports (copied from the SFX Box's list, per port): 1 × 3.5 mm stereo jack, 1 ×
 2N3904 (MMBT3904 or BC547 also work), 1 × 1 kΩ, 1 × 100 kΩ, 1 × 22 Ω, 1 × 4.7 µF, 1 × 100 nF.
@@ -308,3 +321,22 @@ relief, and stick the module down with double-sided foam tape. Set the output to
 *before* connecting anything to it.
 
 **Keep the buck module off the board, a few cm from the XIAO.** Its inductor is the noisiest thing in the box.
+
+## 9. Bring-up, as it went (2026-11-23/24)
+
+The board as built on the SB400 layout in §8, powered from the TalentCell's 12 V. **All of it now works:** 12 V in,
+buck at 5.06 V, XIAO boots and answers, `caps` reads `servos=4 driven=4 sensors=2`, both sensor ports trip and
+release (Ring to Tip), the SFX Box shows them live, and all four servos move on D1–D4. `channels 4` is saved on
+the board. Three faults on the way, each worth a check on the next build:
+
+- **TVS in backwards.** The battery's LEDs stayed dark while plugged in and lit when unplugged: a forward diode
+  across the input is a dead short, and the TalentCell's protection cut out. Diode mode read 0.846 V red-on-centre
+  (should be OL). Flipped the TVS. The check is in §8, under the 12 V side.
+- **A poorly seated 22 Ω** on the sensor 1 block: no tip voltage, so no trip. Reseated.
+- **The servo ground lifted ~1.4 V** above the XIAO's ground (5.08 V from +5 V to one GND strip, 3.6 V to the strip the
+  servo grounds were on). The servos read 3.6–4.0 V, got the 193 mV-average pulse on D1, and still never moved:
+  against their own ground the 3.3 V signal was only ~2 V. Fixed the ground connection; 0 V between the strips, 5.08 V
+  at the servo connector, all four moved. Check 5 in §4 catches it.
+
+Not yet done: the sensor jack cables, and each servo's closed / swing / limits and slots for a real prop.
+
