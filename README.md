@@ -38,9 +38,7 @@ another prop. See `sfx-box/spec-addendum-5.7A-speech-driven-channels.md`.
 | [`docs/03-perfboard-layout.md`](docs/03-perfboard-layout.md) | The electronics pod: layout rules, wiring list, staged assembly and test order |
 | [`docs/04-rf-link.md`](docs/04-rf-link.md) | ESP-NOW: why not WiFi or 433, the SFX Box bridge wiring, and what crosses the link |
 | [`docs/05-parts.md`](docs/05-parts.md) | What was bought and why |
-| [`docs/06-jaw-plan.md`](docs/06-jaw-plan.md) | Plan for a speech-driven servo jaw on the same ESP-NOW link |
-| [`docs/07-servo-s51.md`](docs/07-servo-s51.md) | Smraza S51 micro servo: wiring, control pulses, datasheet limits, what is still unmeasured |
-| [`docs/08-servo-board.md`](docs/08-servo-board.md) | Plan for a 4-servo board on a 12 V input: power path, headers, pins, first-power checks |
+| [Servo-Sensor-board](https://github.com/schubbydoo/Servo-Sensor-board) | **Moved out 2026-11-26:** the servo/sensor remote board (4 servos, 2 sensors) on the same ESP-NOW link, with its servo plan, S51 servo notes and firmware. `docs/06`–`08` here are pointers |
 | [`docs/archive/`](docs/archive/) | Superseded work, kept because the reasoning is still useful |
 
 ## Status
