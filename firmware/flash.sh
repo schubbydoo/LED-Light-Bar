@@ -43,6 +43,7 @@ REMOTE_DIR="lightbar-fw"
 # is the only place either address appears.
 MAC_BAR="F0:9E:9E:B2:A8:28"
 MAC_BRIDGE="F0:9E:9E:B2:3D:38"
+MAC_JAW="44:B1:76:5F:B4:28"
 
 FQBN="esp32:esp32:XIAO_ESP32C3"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -60,7 +61,8 @@ fi
 case "$target" in
     bar)    mac="$MAC_BAR" ;;
     bridge) mac="$MAC_BRIDGE" ;;
-    *)      echo "target must be 'bar' or 'bridge', not '$target'" >&2; exit 2 ;;
+    jaw)    mac="$MAC_JAW" ;;
+    *)      echo "target must be 'bar', 'bridge' or 'jaw', not '$target'" >&2; exit 2 ;;
 esac
 port="/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_${mac}-if00"
 

@@ -5,6 +5,7 @@
 #   ./monitor.sh bar             follow until interrupted
 #   ./monitor.sh bar 30          stop after 30 seconds
 #   ./monitor.sh bar 30 raw      keep the boot ROM and FastLED chatter
+#   ./monitor.sh jaw 45          the servo remote
 #
 # Opening the port resets the board, so what you see always starts from its
 # banner. That is usually what you want — the stages restart with you.
@@ -22,6 +23,7 @@ PY="${SFX_ESPTOOL_PY:-\$HOME/esptool-venv/bin/python}"
 
 MAC_BAR="F0:9E:9E:B2:A8:28"
 MAC_BRIDGE="F0:9E:9E:B2:3D:38"
+MAC_JAW="44:B1:76:5F:B4:28"
 
 target="${1:-}"
 secs="${2:-0}"
@@ -30,7 +32,8 @@ raw="${3:-}"
 case "$target" in
     bar)    mac="$MAC_BAR" ;;
     bridge) mac="$MAC_BRIDGE" ;;
-    *)      echo "usage: ./monitor.sh {bar|bridge} [seconds] [raw]" >&2; exit 2 ;;
+    jaw)    mac="$MAC_JAW" ;;
+    *)      echo "usage: ./monitor.sh {bar|bridge|jaw} [seconds] [raw]" >&2; exit 2 ;;
 esac
 port="/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_${mac}-if00"
 

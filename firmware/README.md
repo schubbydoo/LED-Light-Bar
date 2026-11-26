@@ -9,7 +9,9 @@ Two sketches, two ends of one radio link, versioned together — see the note in
 | `bringup/` | Five staged hardware questions, with the strip attached. |
 | `pixelcheck/` | Whole-strip primaries and fixed markers, held. For when `bringup` raises a question about one pixel or one channel — it removes motion from the answer. |
 | `bar/` | The light bar — the ambience renderer. **Tunable live over serial.** |
-| `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW. **Working.** |
+| `jawcheck/` | Steady hardware-timed servo pulse on D10, moved a little at a time over serial. For finding a servo's real limits on a real mechanism. |
+| `jaw/` | The servo remote: **the bar's remote with the strip swapped for servos** — same link, track, cue, persistence and command language. One board drives up to 4 servos, each a speech-following mouth or a manually positioned channel. Written 2026-11-14; bench-tested with free levers, over the radio, and in a show with two servos. |
+| `bridge/` | The SFX Box's radio — serial ⇄ ESP-NOW, to one or more props. **Working for the bar; multi-prop addressing written 2026-11-12, not yet flashed.** |
 
 ---
 
@@ -40,6 +42,56 @@ esptool --port /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_<MAC>-
 
 Both addresses appear in exactly one place each in `flash.sh` and `monitor.sh`.
 Swap a board, change them there.
+
+---
+
+## More than one prop on the bridge
+
+*Written 2026-11-12, for the planned jaw prop (`docs/06-jaw-plan.md`). **Tested on a PC against a
+fake radio; not yet flashed to a real bridge.** The first flash is the real test.*
+
+A line is for the light bar unless it says otherwise. Nothing that worked before changes:
+
+```
+./send.sh bridge "amb water"        # the bar — exactly as before
+./send.sh bridge "@bar amb water"   # the bar, said explicitly
+./send.sh bridge "@jaw st"          # the jaw prop
+```
+
+The `@name` is stripped before the line goes out, so every prop understands the same commands.
+Replies are tagged by who sent them: the bar's stay exactly as they were (`bar> ...`, `-> ok`),
+and any other prop is named (`jaw> ...`, `-> ok @jaw`).
+
+The prop table is `PEERS[]` near the top of `bridge/bridge.ino`. **The jaw's MAC is set**
+(`44:B1:76:5F:B4:28`), here, in `flash.sh` and in `send.sh`, and nowhere else. A prop whose MAC is
+unset is refused with a clear message rather than sent at nobody.
+
+**Bridge commands** (typed at the bridge, never forwarded): `.stats` delivery counts per prop ·
+`.peers` the table · `.mac` · `.gap` shows the pacing, `.gap 30` sets it.
+
+**Pacing.** The bridge no longer sleeps after each line, which used to stall everything — a cue
+for one prop waited behind a position update for another. Each prop now has its own gap, and a
+line for one can go out while another is inside its gap. **The gap itself is unchanged at 60 ms**,
+because that is what the bar was proven against and nobody has measured less. Two reasons it is
+there: the bar holds one received line and drops anything that arrives before it has taken it, and
+ESP-NOW loses *both* packets if a second is queued before the first completes. `trk` lines always
+keep 60 ms, even if `.gap` is lowered. To go faster, measure: set `.gap 30`, push a track, and
+check that `trk ok` still comes back.
+
+**Two behaviour changes worth knowing.** A line longer than 240 characters is now *refused*
+rather than clipped (the old bridge sent the stump, which silently corrupted a track chunk). And
+the `-> ok` reply is printed when the radio reports back, a few milliseconds after the line, not
+before the bridge moves on.
+
+**Tests that need no board:**
+
+```bash
+./bridge/test/run.sh
+```
+
+It runs the routing and pacing rules in isolation, then the real `bridge.ino` against a fake radio.
+It proves the logic. It does **not** prove the sketch compiles on the real ESP32 core — only
+`./flash.sh bridge bridge` does, so do that before flashing anything to the box.
 
 ---
 
@@ -304,3 +356,51 @@ Compiled defaults are the approved values — `flashHue 0`, `flash 0.6`, `blacko
 **Next, in order:** persist the track to flash; re-judge the palette on matte warm card;
 then a `PIXEL` channel kind and a flow step on the box so this runs from the Show page
 rather than from an SSH session.
+
+
+---
+
+## `jaw/` — the servo remote
+
+Same board, same link, same commands as the bar; only the renderer differs, so the box and its
+web UI treat it as one more remote. `angle = closed + dir * swing * shape(env)`, and at zero
+envelope that is exactly `closed` — idle is speech with a zero envelope, as on the bar.
+
+`show` answers over the radio as **one line of `key=value`** (so a UI can read every setting
+without opening the board's serial port, which reboots it) and `st` begins `st dev=jaw ...`.
+Settings, ranges and defaults are in the header of `jaw/jaw.ino`; `set <key> <value>` changes
+one and `save` keeps them. `swingDeg` is the one to reach for first (default 20).
+
+Calibrate with the jaw mounted: `hold <deg>`, `open`, `close`, widening `loDeg`/`hiDeg` a few
+degrees at a time while watching a power meter. A servo driven into a stop draws its stall
+current (459 mA measured, `docs/07-servo-s51.md`) until told to move.
+
+### Several servos on one board
+
+One board is one prop; each servo is a **channel** (`channels <1..4>`, default 1). Channels 1..4 are on
+D1, D2, D3, D4. Un-prefixed commands mean channel 1, and the single-servo
+`show`/`st` lines are unchanged, so a box that knows one servo keeps working.
+
+A channel's **mode** is `speech` (follows the box's track) or `manual` (goes to a numbered position
+slot with `go <ch> <slot>`, and with `auto <ch> on` repeats between two slots on its own, which is
+how a blink works). Names and labels live on the box; the wire carries channel and slot numbers.
+`stop` releases the track only; `stop all` also ends every `auto`; `auto` lapses after 120 s unless
+repeated. The full command set and reply shapes are in `docs/06-jaw-plan.md` §10 and the header of
+`jaw/jaw.ino`.
+
+**Tested 2026-11-14/15.** On the bench with free levers: commands, limits and persistence over
+serial; a track pushed over the radio and cued from the player's real position with two different
+sounds (it **looked** synchronized); a second servo on channel 2, with slots, `go` and `auto`;
+multi-line `st` replies over the radio; and a real show with both servos, which the user reports
+worked perfectly. **Sync has not been measured** the way the bar's was (±55 ms), no real jaw has
+been tried, and speech on two servos at once is untested, so the swing, attack, release and slew
+defaults are still starting points for tuning by eye.
+
+### Sensors and `caps`
+
+Two sensor ports, D7 (sensor 1) and D10 (sensor 2), the same circuit as the SFX Box's own. Each change
+goes out unasked as `ev sensor <n> <1|0> <seq>` (three copies, 40 ms apart, same seq), and is printed
+on serial too, so `./monitor.sh jaw 45` is the quickest check that a press arrived. `sens` reads them
+back. `caps dev=jaw v=1 servos=4 driven=<n> sensors=2 sens=<n1><n2>` (on request, and once at boot)
+says what the board has; `sens=10` is a state string (sensor 1 active), not a count. The box shows
+both sensors live on its Hardware page. Wiring and bring-up: `docs/08-servo-board.md` §7 and §9.

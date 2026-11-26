@@ -107,7 +107,7 @@ numbers and opens a mouth with them.
 SFX Box's USB:
 
     firmware/bar/       the light bar — ambience renderer, ESP-NOW receiver
-    firmware/bridge/    the SFX Box's radio — serial ⇄ ESP-NOW, ~40 lines
+    firmware/bridge/    the SFX Box's radio — serial ⇄ ESP-NOW, one or more props
 
 They are two ends of **one** protocol and have to version together. A copy of the bridge in
 the SFX Box repo would drift the moment the message set changed, and that drift shows up as a
